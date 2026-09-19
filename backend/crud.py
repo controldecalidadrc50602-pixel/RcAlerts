@@ -36,12 +36,17 @@ def compute_health(sessions: int, prev_sessions: int, user_msgs: int, bot_msgs: 
         score -= 25.0
         issues.append(f"Saturación por Bot ({auto_ratio:.0f}%) con abandono de agentes humanos")
 
+    # 5 Niveles Oficiales de Calidad Corporativa
     if score < 60.0 or status == "red":
-        status = "red"
+        status = "critico"       # 0 - 59: Crítico (Rojo)
+    elif score < 70.0:
+        status = "desarrollo"    # 60 - 69: En Desarrollo (Naranja)
     elif score < 80.0 or len(issues) > 0:
-        status = "yellow"
+        status = "aceptable"     # 70 - 79: Aceptable (Amarillo)
+    elif score < 90.0:
+        status = "optimo"        # 80 - 89: Óptimo (Verde)
     else:
-        status = "green"
+        status = "sobresaliente" # 90 - 100: Sobresaliente (Verde Oscuro)
 
     return {
         "auto_ratio": round(auto_ratio, 2),

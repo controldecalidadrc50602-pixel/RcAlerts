@@ -157,9 +157,60 @@
       font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px;
       display: inline-flex; align-items: center; gap: 4px;
     }
-    .badge-red { background: var(--danger-bg); color: var(--danger); }
-    .badge-yellow { background: var(--warning-bg); color: var(--warning); }
-    .badge-green { background: var(--success-bg); color: var(--success); }
+    .badge-sobresaliente { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+    .badge-optimo { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+    .badge-aceptable { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
+    .badge-desarrollo { background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
+    .badge-critico { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+    /* Compatibilidad legacy con badges previos */
+    .badge-red { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .badge-yellow { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
+    .badge-green { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+
+    /* Bordes de estado para tarjetas de clientes */
+    .client-card.card-sobresaliente { border-left: 4px solid #059669; }
+    .client-card.card-optimo { border-left: 4px solid #10b981; }
+    .client-card.card-aceptable { border-left: 4px solid #eab308; }
+    .client-card.card-desarrollo { border-left: 4px solid #f97316; }
+    .client-card.card-critico { border-left: 4px solid #ef4444; }
+
+    /* Sombreado tenue estilo semáforo para filas de tablas */
+    tr.row-sobresaliente {
+      background-color: rgba(5, 150, 105, 0.035) !important;
+      border-left: 3.5px solid #059669 !important;
+    }
+    tr.row-sobresaliente:hover {
+      background-color: rgba(5, 150, 105, 0.08) !important;
+    }
+    tr.row-optimo {
+      background-color: rgba(16, 185, 129, 0.035) !important;
+      border-left: 3.5px solid #10b981 !important;
+    }
+    tr.row-optimo:hover {
+      background-color: rgba(16, 185, 129, 0.08) !important;
+    }
+    tr.row-aceptable {
+      background-color: rgba(234, 179, 8, 0.045) !important;
+      border-left: 3.5px solid #eab308 !important;
+    }
+    tr.row-aceptable:hover {
+      background-color: rgba(234, 179, 8, 0.09) !important;
+    }
+    tr.row-desarrollo {
+      background-color: rgba(249, 115, 22, 0.045) !important;
+      border-left: 3.5px solid #f97316 !important;
+    }
+    tr.row-desarrollo:hover {
+      background-color: rgba(249, 115, 22, 0.09) !important;
+    }
+    tr.row-critico {
+      background-color: rgba(239, 68, 68, 0.045) !important;
+      border-left: 3.5px solid #ef4444 !important;
+    }
+    tr.row-critico:hover {
+      background-color: rgba(239, 68, 68, 0.09) !important;
+    }
 
     .metrics-mini-grid {
       display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0;
@@ -409,18 +460,39 @@
           </div>
         </div>
 
-        <div class="benchmark-card">
+        <div class="benchmark-card" style="background: linear-gradient(145deg, #0f172a, #1e1b4b); color: #fff; border-radius: 14px; padding: 18px 20px;">
           <div>
-            <span style="font-size: 10px; font-weight: 800; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 12px; text-transform: uppercase;">Benchmark Cuantitativo</span>
-            <h4 style="font-size: 14px; margin-top: 6px;">Estándares de la Industria</h4>
-            <ul class="bench-list">
-              <li><span>Automatización Bot:</span><span class="bench-value" style="color: #34d399;">55% - 75%</span></li>
-              <li><span>Entrega Plantillas:</span><span class="bench-value" style="color: #34d399;">&gt; 85%</span></li>
-              <li><span>Respuesta Plantillas:</span><span class="bench-value" style="color: #fbbf24;">6% - 15%</span></li>
-              <li><span>Riesgo Crítico (Churn):</span><span class="bench-value" style="color: #f87171;">&lt; 3% resp. o WoW &le; -20%</span></li>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 10px; font-weight: 800; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 12px; text-transform: uppercase;">Marco Oficial de Calidad</span>
+              <span style="font-size: 10px; color: #a5b4fc; font-weight: 700;">5 Niveles Corporativos</span>
+            </div>
+            <h4 style="font-size: 13px; margin-top: 8px; font-weight: 800;">Escala Oficial de Evaluación</h4>
+            <ul class="bench-list" style="margin-top: 8px; font-size: 11px; gap: 6px;">
+              <li>
+                <span>🟢 <strong>90–100</strong> Sobresaliente</span>
+                <span class="bench-value" style="color: #34d399; font-size: 10px;">Supera expectativas</span>
+              </li>
+              <li>
+                <span>🟢 <strong>80–89</strong> Óptimo</span>
+                <span class="bench-value" style="color: #6ee7b7; font-size: 10px;">Cumple y mantiene sólido</span>
+              </li>
+              <li>
+                <span>🟡 <strong>70–79</strong> Aceptable</span>
+                <span class="bench-value" style="color: #fde047; font-size: 10px;">Oportunidades de mejora</span>
+              </li>
+              <li>
+                <span>🟠 <strong>60–69</strong> En Desarrollo</span>
+                <span class="bench-value" style="color: #fb923c; font-size: 10px;">Plan de mejora y seguimiento</span>
+              </li>
+              <li>
+                <span>🔴 <strong>0–59</strong> Crítico</span>
+                <span class="bench-value" style="color: #f87171; font-size: 10px;">Intervención inmediata</span>
+              </li>
             </ul>
           </div>
-          <p style="font-size: 10px; opacity: 0.7; margin-top: 10px;">Base estructurada para razonamiento en NotebookLM.</p>
+          <p style="font-size: 10px; opacity: 0.75; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 6px;">
+            Sombreado semáforo de filas y auditoría MoM en tiempo real.
+          </p>
         </div>
       </div>
 
@@ -434,9 +506,11 @@
           <div class="filter-bar no-print">
             <input type="text" id="client-search" class="search-input" placeholder="🔍 Buscar cliente en cartera...">
             <button class="filter-btn active" data-filter="all">Todos (<span id="count-all">0</span>)</button>
-            <button class="filter-btn" data-filter="red" style="color: var(--danger);">🔴 Riesgo (<span id="count-red">0</span>)</button>
-            <button class="filter-btn" data-filter="yellow" style="color: var(--warning);">🟡 Precaución (<span id="count-yellow">0</span>)</button>
-            <button class="filter-btn" data-filter="green" style="color: var(--success);">🟢 Saludable (<span id="count-green">0</span>)</button>
+            <button class="filter-btn" data-filter="sobresaliente" style="color: #059669;">🟢 Sobresaliente (<span id="count-sobresaliente">0</span>)</button>
+            <button class="filter-btn" data-filter="optimo" style="color: #10b981;">🟢 Óptimo (<span id="count-optimo">0</span>)</button>
+            <button class="filter-btn" data-filter="aceptable" style="color: #d97706;">🟡 Aceptable (<span id="count-aceptable">0</span>)</button>
+            <button class="filter-btn" data-filter="desarrollo" style="color: #ea580c;">🟠 En Desarrollo (<span id="count-desarrollo">0</span>)</button>
+            <button class="filter-btn" data-filter="critico" style="color: #e11d48;">🔴 Crítico (<span id="count-critico">0</span>)</button>
           </div>
         </div>
 
@@ -1044,6 +1118,178 @@
       return /^(https?:\/\/)/i.test(clean) ? clean : '#';
     }
 
+    // 5 NIVELES OFICIALES DE CALIDAD CORPORATIVA
+    function evaluateQualityTier(scoreOrStatus, extraScore) {
+      let score = null;
+      let statusStr = '';
+
+      if (typeof scoreOrStatus === 'number') {
+        score = scoreOrStatus;
+      } else if (typeof scoreOrStatus === 'string') {
+        statusStr = scoreOrStatus.toLowerCase().trim();
+      } else if (scoreOrStatus && typeof scoreOrStatus === 'object') {
+        if (scoreOrStatus.churn_score !== undefined && scoreOrStatus.churn_score !== null) {
+          score = Number(scoreOrStatus.churn_score);
+        } else if (scoreOrStatus.score !== undefined && scoreOrStatus.score !== null) {
+          score = Number(scoreOrStatus.score);
+        }
+        statusStr = String(scoreOrStatus.status || '').toLowerCase().trim();
+      }
+
+      if (extraScore !== undefined && extraScore !== null && !isNaN(extraScore)) {
+        score = Number(extraScore);
+      }
+
+      // Si tenemos score cuantitativo directo (0 - 100)
+      if (score !== null && !isNaN(score)) {
+        if (score >= 90) {
+          return {
+            tier: 'sobresaliente',
+            name: 'Sobresaliente',
+            label: '🟢 Sobresaliente',
+            badgeClass: 'badge-sobresaliente',
+            rowClass: 'row-sobresaliente',
+            cardClass: 'card-sobresaliente',
+            color: '#059669',
+            range: '90–100',
+            dot: '🟢',
+            score: Math.round(score),
+            interpretation: 'Supera consistentemente las expectativas'
+          };
+        } else if (score >= 80) {
+          return {
+            tier: 'optimo',
+            name: 'Óptimo',
+            label: '🟢 Óptimo',
+            badgeClass: 'badge-optimo',
+            rowClass: 'row-optimo',
+            cardClass: 'card-optimo',
+            color: '#10b981',
+            range: '80–89',
+            dot: '🟢',
+            score: Math.round(score),
+            interpretation: 'Cumple plenamente y mantiene desempeño sólido'
+          };
+        } else if (score >= 70) {
+          return {
+            tier: 'aceptable',
+            name: 'Aceptable',
+            label: '🟡 Aceptable',
+            badgeClass: 'badge-aceptable',
+            rowClass: 'row-aceptable',
+            cardClass: 'card-aceptable',
+            color: '#eab308',
+            range: '70–79',
+            dot: '🟡',
+            score: Math.round(score),
+            interpretation: 'Cumple, pero presenta oportunidades concretas de mejora'
+          };
+        } else if (score >= 60) {
+          return {
+            tier: 'desarrollo',
+            name: 'En Desarrollo',
+            label: '🟠 En Desarrollo',
+            badgeClass: 'badge-desarrollo',
+            rowClass: 'row-desarrollo',
+            cardClass: 'card-desarrollo',
+            color: '#f97316',
+            range: '60–69',
+            dot: '🟠',
+            score: Math.round(score),
+            interpretation: 'Requiere plan de mejora y seguimiento'
+          };
+        } else {
+          return {
+            tier: 'critico',
+            name: 'Crítico',
+            label: '🔴 Crítico',
+            badgeClass: 'badge-critico',
+            rowClass: 'row-critico',
+            cardClass: 'card-critico',
+            color: '#ef4444',
+            range: '0–59',
+            dot: '🔴',
+            score: Math.round(score),
+            interpretation: 'Desempeño insuficiente; requiere intervención inmediata'
+          };
+        }
+      }
+
+      // Si sólo tenemos cadena de status (o compatibilidad con inputs previos)
+      switch (statusStr) {
+        case 'sobresaliente':
+          return {
+            tier: 'sobresaliente',
+            name: 'Sobresaliente',
+            label: '🟢 Sobresaliente',
+            badgeClass: 'badge-sobresaliente',
+            rowClass: 'row-sobresaliente',
+            cardClass: 'card-sobresaliente',
+            color: '#059669',
+            range: '90–100',
+            dot: '🟢',
+            interpretation: 'Supera consistentemente las expectativas'
+          };
+        case 'optimo':
+        case 'green':
+          return {
+            tier: 'optimo',
+            name: 'Óptimo',
+            label: '🟢 Óptimo',
+            badgeClass: 'badge-optimo',
+            rowClass: 'row-optimo',
+            cardClass: 'card-optimo',
+            color: '#10b981',
+            range: '80–89',
+            dot: '🟢',
+            interpretation: 'Cumple plenamente y mantiene desempeño sólido'
+          };
+        case 'aceptable':
+        case 'yellow':
+          return {
+            tier: 'aceptable',
+            name: 'Aceptable',
+            label: '🟡 Aceptable',
+            badgeClass: 'badge-aceptable',
+            rowClass: 'row-aceptable',
+            cardClass: 'card-aceptable',
+            color: '#eab308',
+            range: '70–79',
+            dot: '🟡',
+            interpretation: 'Cumple, pero presenta oportunidades concretas de mejora'
+          };
+        case 'desarrollo':
+        case 'orange':
+          return {
+            tier: 'desarrollo',
+            name: 'En Desarrollo',
+            label: '🟠 En Desarrollo',
+            badgeClass: 'badge-desarrollo',
+            rowClass: 'row-desarrollo',
+            cardClass: 'card-desarrollo',
+            color: '#f97316',
+            range: '60–69',
+            dot: '🟠',
+            interpretation: 'Requiere plan de mejora y seguimiento'
+          };
+        case 'critico':
+        case 'red':
+        default:
+          return {
+            tier: 'critico',
+            name: 'Crítico',
+            label: '🔴 Crítico',
+            badgeClass: 'badge-critico',
+            rowClass: 'row-critico',
+            cardClass: 'card-critico',
+            color: '#ef4444',
+            range: '0–59',
+            dot: '🔴',
+            interpretation: 'Desempeño insuficiente; requiere intervención inmediata'
+          };
+      }
+    }
+
     let clientsData = [];
     let availablePeriods = [];
     let currentPeriod = '';
@@ -1233,14 +1479,13 @@
         const item = document.createElement('div');
         item.className = 'sidebar-client-item';
         
-        const statusColor = c.status === 'red' ? '#e11d48' : (c.status === 'yellow' ? '#f59e0b' : '#10b981');
-        const statusText = c.status === 'red' ? 'Riesgo Churn' : (c.status === 'yellow' ? 'Precaución' : 'Saludable');
+        const qTier = evaluateQualityTier(c);
         
         item.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <span style="font-size: 13px; font-weight: 800; color: var(--text-main);">${escapeHtml(c.name)}</span>
-            <span style="font-size: 10px; font-weight: 700; color: ${statusColor}; background: #fff; padding: 2px 6px; border-radius: 8px; border: 1px solid var(--border);">
-              ${statusText}
+            <span class="badge ${qTier.badgeClass}" style="font-size: 10px; padding: 2px 6px;" title="${qTier.interpretation}">
+              ${qTier.label}
             </span>
           </div>
           <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; margin-bottom: 8px;">
@@ -1318,7 +1563,8 @@
     function getFilteredClients() {
       return (clientsData || []).filter(c => {
         if (!c) return false;
-        const matchesFilter = (currentFilter === 'all' || c.status === currentFilter);
+        const qTier = evaluateQualityTier(c);
+        const matchesFilter = (currentFilter === 'all' || qTier.tier === currentFilter || c.status === currentFilter);
         const nameStr = (c.name || '').toLowerCase();
         const idStr = (c.id || '').toLowerCase();
         const matchesSearch = !searchQuery || nameStr.includes(searchQuery) || idStr.includes(searchQuery);
@@ -1339,12 +1585,11 @@
       }
 
       let totalSessions = 0, totalPrevSessions = 0, totalMsgs = 0, sumAutoRatio = 0, totalDelivered = 0, totalReplies = 0;
-      const counts = { all: clientsData.length, red: 0, yellow: 0, green: 0 };
+      const counts = { all: clientsData.length, sobresaliente: 0, optimo: 0, aceptable: 0, desarrollo: 0, critico: 0 };
 
       clientsData.forEach(c => {
-        if (c && c.status) {
-          counts[c.status] = (counts[c.status] || 0) + 1;
-        }
+        const qTier = evaluateQualityTier(c);
+        counts[qTier.tier] = (counts[qTier.tier] || 0) + 1;
         totalSessions += Number(c.sessions || 0);
         totalPrevSessions += Number(c.prev_sessions || c.sessions || 0);
         totalMsgs += Number((c.user_msgs || 0) + (c.bot_msgs || 0) + (c.agent_msgs || 0));
@@ -1354,9 +1599,11 @@
       });
 
       document.getElementById('count-all').textContent = counts.all;
-      document.getElementById('count-red').textContent = counts.red || 0;
-      document.getElementById('count-yellow').textContent = counts.yellow || 0;
-      document.getElementById('count-green').textContent = counts.green || 0;
+      if (document.getElementById('count-sobresaliente')) document.getElementById('count-sobresaliente').textContent = counts.sobresaliente;
+      if (document.getElementById('count-optimo')) document.getElementById('count-optimo').textContent = counts.optimo;
+      if (document.getElementById('count-aceptable')) document.getElementById('count-aceptable').textContent = counts.aceptable;
+      if (document.getElementById('count-desarrollo')) document.getElementById('count-desarrollo').textContent = counts.desarrollo;
+      if (document.getElementById('count-critico')) document.getElementById('count-critico').textContent = counts.critico;
 
       // Detección automática de tarjeta huérfana de plantillas
       const orphanClient = clientsData.find(c => (c.name || '').toLowerCase().includes('sessionstartingcauses'));
@@ -1384,15 +1631,14 @@
       const filtered = getFilteredClients();
 
       filtered.forEach(c => {
-        const badgeClass = c.status === 'red' ? 'badge-red' : (c.status === 'yellow' ? 'badge-yellow' : 'badge-green');
-        const badgeLabel = c.status === 'red' ? '🔴 Riesgo Churn' : (c.status === 'yellow' ? '🟡 Precaución' : '🟢 Saludable');
+        const qTier = evaluateQualityTier(c);
         const safeUrl = sanitizeUrl(c.website);
         const displayUrl = escapeHtml((c.website || '').replace(/^https?:\/\//i, ''));
         const deltaPct = Number(c.delta_sessions_pct || 0);
         const deltaAbs = Number(c.delta_sessions_abs || 0);
 
         const card = document.createElement('div');
-        card.className = 'client-card';
+        card.className = `client-card ${qTier.cardClass}`;
         card.onclick = () => openClientModal(c);
 
         card.innerHTML = `
@@ -1406,7 +1652,7 @@
                   ${displayUrl || 'Ver web'} ↗
                 </a>
               </div>
-              <span class="badge ${badgeClass}">${badgeLabel}</span>
+              <span class="badge ${qTier.badgeClass}" title="${qTier.interpretation}">${qTier.label}</span>
             </div>
 
             <div class="metrics-mini-grid">
@@ -1497,12 +1743,12 @@
       }
 
       listToRender.forEach(c => {
+        const qTier = evaluateQualityTier(c);
         const tr = document.createElement('tr');
+        tr.className = qTier.rowClass;
         const deltaAbs = Number(c.delta_sessions_abs || 0);
         const deltaPct = Number(c.delta_sessions_pct || 0);
         const diffClass = deltaAbs >= 0 ? 'diff-pos' : 'diff-neg';
-        const badgeClass = c.status === 'red' ? 'badge-red' : (c.status === 'yellow' ? 'badge-yellow' : 'badge-green');
-        const badgeLabel = c.status === 'red' ? '🔴 Riesgo' : (c.status === 'yellow' ? '🟡 Precaución' : '🟢 Saludable');
         const pDate = c.report_date || 'Reciente';
 
         tr.innerHTML = `
@@ -1550,7 +1796,7 @@
               ${Number(c.templates_replies || 0).toLocaleString()} resp
             </div>
           </td>
-          <td style="text-align: center;"><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+          <td style="text-align: center;"><span class="badge ${qTier.badgeClass}" title="${qTier.interpretation}">${qTier.label}</span></td>
         `;
         tbody.appendChild(tr);
       });
@@ -1729,14 +1975,19 @@
       const ctx2 = canvas2.getContext('2d');
       if (scatterQuadrantInstance) scatterQuadrantInstance.destroy();
 
-      const scatterData = clientsData.map(c => ({
-        x: Number(c?.auto_ratio || 0),
-        y: Number(c?.reply_rate || 0),
-        clientName: String(c?.name || 'Cliente'),
-        replies: Number(c?.templates_replies || 0),
-        delivered: Number(c?.templates_delivered || 0),
-        status: c?.status || 'green'
-      }));
+      const scatterData = clientsData.map(c => {
+        const qTier = evaluateQualityTier(c);
+        return {
+          x: Number(c?.auto_ratio || 0),
+          y: Number(c?.reply_rate || 0),
+          clientName: String(c?.name || 'Cliente'),
+          replies: Number(c?.templates_replies || 0),
+          delivered: Number(c?.templates_delivered || 0),
+          color: qTier.color,
+          tierName: qTier.name,
+          status: qTier.tier
+        };
+      });
 
       // Plugin para dibujar líneas de benchmark y etiquetas de cuadrantes
       const quadrantGuidePlugin = {
@@ -1790,7 +2041,7 @@
           datasets: [{
             label: 'Cuentas',
             data: scatterData,
-            pointBackgroundColor: scatterData.map(d => d.status === 'red' ? '#e11d48' : (d.status === 'yellow' ? '#d97706' : '#10b981')),
+            pointBackgroundColor: scatterData.map(d => d.color),
             pointBorderColor: '#ffffff',
             pointBorderWidth: 2,
             pointRadius: 7,
@@ -1976,8 +2227,7 @@
 
         // Mes más reciente para summaryBox
         const latest = history[history.length - 1];
-        const statusBadgeClass = latest.status === 'red' ? 'badge-red' : (latest.status === 'yellow' ? 'badge-yellow' : 'badge-green');
-        const statusBadgeText = latest.status === 'red' ? '🔴 Riesgo Crítico Churn' : (latest.status === 'yellow' ? '🟡 Precaución Operativa' : '🟢 Saludable');
+        const latestQTier = evaluateQualityTier(latest);
         const u = Number(latest.user_msgs || 0);
         const a = Number(latest.agent_msgs || 0);
         const b = Number(latest.bot_msgs || 0);
@@ -2011,24 +2261,25 @@
               </div>
               <div style="font-size: 10px; color: var(--text-muted);">${Number(latest.templates_replies || 0).toLocaleString()} respuestas</div>
             </div>
-            <div style="text-align: right; min-width: 120px;">
-              <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px;">Diagnóstico</div>
-              <span class="badge ${statusBadgeClass}">${statusBadgeText}</span>
+            <div style="text-align: right; min-width: 140px;">
+              <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px;">Nivel de Calidad</div>
+              <span class="badge ${latestQTier.badgeClass}" title="${latestQTier.interpretation}">${latestQTier.label}</span>
+              <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">${latestQTier.interpretation}</div>
             </div>
           `;
         }
 
-        // Renderizar tabla cronológica individual con flechas de interacción
+        // Renderizar tabla cronológica individual con flechas de interacción y sombreado semáforo
         tbody.innerHTML = '';
         history.forEach((h, idx) => {
+          const qTier = evaluateQualityTier(h);
           const tr = document.createElement('tr');
+          tr.className = qTier.rowClass;
           const prevH = idx > 0 ? history[idx - 1] : null;
 
           const deltaAbs = h.mom_sessions_abs !== undefined ? Number(h.mom_sessions_abs) : (Number(h.sessions || 0) - (prevH ? Number(prevH.sessions || 0) : Number(h.prev_sessions || 0)));
           const deltaPct = h.mom_sessions_pct !== undefined ? Number(h.mom_sessions_pct) : (prevH && prevH.sessions > 0 ? ((deltaAbs / prevH.sessions) * 100) : 0);
           const diffClass = deltaAbs >= 0 ? 'diff-pos' : 'diff-neg';
-          const rowStatusBadgeClass = h.status === 'red' ? 'badge-red' : (h.status === 'yellow' ? 'badge-yellow' : 'badge-green');
-          const rowStatusBadgeLabel = h.status === 'red' ? '🔴 Riesgo' : (h.status === 'yellow' ? '🟡 Precaución' : '🟢 Saludable');
           
           const userMsgs = Number(h.user_msgs || 0);
           const agentMsgs = Number(h.agent_msgs || 0);
@@ -2104,7 +2355,7 @@
                 ${Number(h.templates_replies || 0).toLocaleString()} resp
               </div>
             </td>
-            <td style="text-align: center;"><span class="badge ${rowStatusBadgeClass}">${rowStatusBadgeLabel}</span></td>
+            <td style="text-align: center;"><span class="badge ${qTier.badgeClass}" title="${qTier.interpretation}">${qTier.label}</span></td>
           `;
           tbody.appendChild(tr);
         });
@@ -3374,13 +3625,12 @@
         // Llenar tabla cronológica de Plantillas (Pestaña 1)
         if (tbody) {
           tbody.innerHTML = currentClientHistory.map(h => {
+            const qTier = evaluateQualityTier(h);
             const deltaPct = Number(h.mom_sessions_pct || 0);
             const deltaAbs = Number(h.mom_sessions_abs || 0);
-            const stBadge = h.status === 'red' ? '🔴 Riesgo' : (h.status === 'yellow' ? '🟡 Precaución' : '🟢 Saludable');
-            const stClass = h.status === 'red' ? 'badge-red' : (h.status === 'yellow' ? 'badge-yellow' : 'badge-green');
             const isSelectedPeriod = currentPeriod && h.report_date === currentPeriod;
             return `
-              <tr style="${isSelectedPeriod ? 'background: #f5f3ff; font-weight: bold;' : ''}">
+              <tr class="${qTier.rowClass}" style="${isSelectedPeriod ? 'font-weight: bold;' : ''}">
                 <td><strong>📅 ${escapeHtml(h.report_date)}</strong> ${isSelectedPeriod ? '<span style="color:var(--primary); font-size:9px;">(Activo)</span>' : ''}</td>
                 <td style="text-align: right; font-family: monospace;">${Number(h.sessions || 0).toLocaleString()}</td>
                 <td style="text-align: right; font-family: monospace; color: ${deltaPct >= 0 ? 'var(--success)' : 'var(--danger)'};">
@@ -3392,7 +3642,7 @@
                 <td style="text-align: right; font-family: monospace; font-weight: 700; color: ${Number(h.reply_rate || 0) < 6 ? 'var(--danger)' : 'var(--success)'};">
                   ${Number(h.reply_rate || 0).toFixed(1)}%
                 </td>
-                <td style="text-align: center;"><span class="badge ${stClass}" style="font-size: 10px; padding: 1px 6px;">${stBadge}</span></td>
+                <td style="text-align: center;"><span class="badge ${qTier.badgeClass}" style="font-size: 10px; padding: 1px 6px;" title="${qTier.interpretation}">${qTier.label}</span></td>
               </tr>
             `;
           }).join('');
@@ -3401,6 +3651,7 @@
         // Llenar tabla cronológica de Mensajes (Pestaña 2)
         if (msgTbody) {
           msgTbody.innerHTML = currentClientHistory.map((h, idx) => {
+            const qTier = evaluateQualityTier(h);
             const u = Number(h.user_msgs || 0);
             const a = Number(h.agent_msgs || 0);
             const b = Number(h.bot_msgs || 0);
@@ -3468,7 +3719,7 @@
 
             const isSelectedPeriod = currentPeriod && h.report_date === currentPeriod;
             return `
-              <tr style="${isSelectedPeriod ? 'background: #f5f3ff; font-weight: bold;' : ''}">
+              <tr class="${qTier.rowClass}" style="${isSelectedPeriod ? 'font-weight: bold;' : ''}">
                 <td><strong>📅 ${escapeHtml(h.report_date)}</strong> ${isSelectedPeriod ? '<span style="color:var(--primary); font-size:9px;">(Activo)</span>' : ''}</td>
                 <td style="text-align: right; font-family: monospace;">${Number(h.sessions || 0).toLocaleString()}</td>
                 <td style="text-align: right; font-family: monospace; font-weight: 700; color: #4f46e5;">${u.toLocaleString()}${uArrow}</td>
@@ -3541,10 +3792,11 @@
       document.getElementById('modal-client-name').textContent = client.name || 'Sin Nombre';
       document.getElementById('modal-client-meta').textContent = `${client.industry || 'General'} • Web: ${client.website || 'sin-web.com'} • Período: ${client.report_date || 'Reciente'}`;
 
+      const qTier = evaluateQualityTier(client);
       const badge = document.getElementById('modal-status-badge');
       if (badge) {
-        badge.textContent = client.status === 'red' ? '🔴 Riesgo Crítico Churn' : (client.status === 'yellow' ? '🟡 Precaución Operativa' : '🟢 Operación Saludable');
-        badge.className = `badge ${client.status === 'red' ? 'badge-red' : (client.status === 'yellow' ? 'badge-yellow' : 'badge-green')}`;
+        badge.textContent = `${qTier.label} • ${qTier.interpretation}`;
+        badge.className = `badge ${qTier.badgeClass}`;
       }
 
       const deltaPct = Number(client.delta_sessions_pct || 0);
