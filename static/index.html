@@ -431,14 +431,31 @@
         </div>
 
         <!-- BADGES DE ARCHIVOS DETECTADOS -->
-        <div id="ingest-files-summary" style="margin: 12px 0; display: flex; flex-direction: column; gap: 6px;">
-          <div id="file-badge-sessions" style="font-size: 11px; padding: 6px 12px; border-radius: 8px; background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; display: flex; align-items: center; justify-content: space-between;">
-            <span>📊 <strong>Sesiones:</strong> <span id="lbl-sessions-file">Detectando...</span></span>
-            <span id="lbl-sessions-stats" style="font-weight: 700; font-family: monospace;"></span>
+        <div id="ingest-files-summary" style="margin: 12px 0; display: flex; flex-direction: column; gap: 8px;">
+          <div id="file-badge-sessions" style="font-size: 11px; padding: 8px 12px; border-radius: 8px; background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+            <div>
+              <span>📊 <strong>Reporte de Sesiones / Chats:</strong> <span id="lbl-sessions-file">Sin archivo adjunto</span></span>
+              <span id="lbl-sessions-stats" style="font-weight: 700; font-family: monospace; display: block; margin-top: 2px; color: #1e1b4b;">0 sesiones</span>
+            </div>
+            <div>
+              <label for="inp-modal-sessions-file" class="btn btn-default" style="font-size: 10px; padding: 4px 8px; cursor: pointer;">
+                📂 Adjuntar Sesiones
+              </label>
+              <input type="file" id="inp-modal-sessions-file" accept=".csv,.tsv,.txt" style="display: none;">
+            </div>
           </div>
-          <div id="file-badge-templates" style="font-size: 11px; padding: 6px 12px; border-radius: 8px; background: #faf5ff; color: #6b21a8; border: 1px solid #e9d5ff; display: flex; align-items: center; justify-content: space-between;">
-            <span>📨 <strong>Plantillas:</strong> <span id="lbl-templates-file">Sin archivo adjunto</span></span>
-            <span id="lbl-templates-stats" style="font-weight: 700; font-family: monospace;"></span>
+
+          <div id="file-badge-templates" style="font-size: 11px; padding: 8px 12px; border-radius: 8px; background: #faf5ff; color: #6b21a8; border: 1px solid #e9d5ff; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+            <div>
+              <span>📨 <strong>Reporte Plantillas (sessionStartingCauses):</strong> <span id="lbl-templates-file">Sin archivo adjunto</span></span>
+              <span id="lbl-templates-stats" style="font-weight: 700; font-family: monospace; display: block; margin-top: 2px; color: #4c1d95;">0 enviadas | 0 respuestas</span>
+            </div>
+            <div>
+              <label for="inp-modal-templates-file" class="btn btn-default" style="font-size: 10px; padding: 4px 8px; cursor: pointer;">
+                📎 Adjuntar Plantillas
+              </label>
+              <input type="file" id="inp-modal-templates-file" accept=".csv,.tsv,.txt" style="display: none;">
+            </div>
           </div>
         </div>
 
@@ -485,9 +502,8 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
               <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #6b21a8;">Métricas Outbound de Plantillas WhatsApp</h4>
               <label for="inp-modal-templates-file" class="btn btn-default" style="font-size: 10px; padding: 4px 8px; cursor: pointer;">
-                📎 Cargar / Adjuntar CSV de Plantillas
+                📎 Cargar / Reemplazar TSV de Plantillas
               </label>
-              <input type="file" id="inp-modal-templates-file" accept=".csv,.tsv,.txt" style="display: none;">
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
               <div class="form-group">
@@ -504,6 +520,7 @@
               </div>
             </div>
           </div>
+
 
           <!-- RESUMEN CALCULADO DEL ARCHIVO -->
           <div class="summary-box">
@@ -947,44 +964,121 @@
       }
     }
 
+    // BUFFERS DE ARCHIVOS PARA CORRELACIÓN DUAL
+    let pendingSessionsData = null;
+    let pendingTemplatesData = null;
+
     function isTemplatesFile(rows, fileName) {
       const fName = (fileName || '').toLowerCase();
-      if (fName.includes('plantilla') || fName.includes('template') || fName.includes('hsm') || fName.includes('outbound')) {
+      // 1. Detección por nombre de archivo de Botmaker
+      if (
+        fName.includes('sessionstartingcauses') || 
+        fName.includes('startingcause') || 
+        fName.includes('plantilla') || 
+        fName.includes('template') || 
+        fName.includes('hsm') || 
+        fName.includes('outbound') ||
+        fName.includes('notificacion') ||
+        fName.includes('notification')
+      ) {
         return true;
       }
       if (!rows || !rows.length) return false;
       const sample = rows[0];
       const keys = Object.keys(sample).map(k => String(k).toLowerCase());
-      const hasTemplateCols = keys.some(k => 
-        k.includes('plantilla') || k.includes('template') || 
-        k.includes('enviad') || k.includes('entregad') || 
-        k.includes('leíd') || k.includes('leid') || 
-        k.includes('respuest') || k.includes('repli') || k.includes('respond')
+
+      // 2. Detección por columnas típicas de reportes de plantillas / causas de inicio en Botmaker
+      return keys.some(k => 
+        k.includes('sentplural') || 
+        k.includes('deliveredplural') || 
+        k.includes('readplural') || 
+        k.includes('answeredplural') || 
+        k.includes('notsentplural') || 
+        k.includes('respuestas de usuarios') || 
+        k.includes('inicios de sesión') || 
+        k.includes('inicios de sesion') ||
+        k.includes('causa de inicio') ||
+        k.includes('nombre de plantilla')
       );
-      const hasSessionCols = keys.some(k => 
-        k.includes('sesion') || k.includes('session') || 
-        k.includes('mensajes usuario') || k.includes('mensajes bot') || k.includes('mensajes agente')
-      );
-      return hasTemplateCols && !hasSessionCols;
     }
 
     function processTemplatesRows(rows, fileName) {
       let totalSent = 0;
       let totalDelivered = 0;
       let totalReplies = 0;
+      let detectedChannel = '';
+
+      if (!rows || !rows.length) {
+        return { fileName, sent: 0, delivered: 0, replies: 0 };
+      }
+
+      // Comprobar si hay columnas con valores numéricos agregados
+      let sumSent = 0, sumDelivered = 0, sumReplies = 0;
+      let hasAggregatedCols = false;
 
       rows.forEach(r => {
         if (!r || typeof r !== 'object') return;
-        const s = Number(normalizeField(r, ['enviadas', 'enviados', 'sent', 'total enviados', 'mensajes enviados', 'cantidad']) || 0);
-        const d = Number(normalizeField(r, ['entregadas', 'entregados', 'delivered', 'recibidas', 'recibidos']) || 0);
-        const rep = Number(normalizeField(r, ['respuestas', 'respondidas', 'respondidos', 'replies', 'replied', 'contestadas']) || 0);
-        totalSent += s;
-        totalDelivered += d;
-        totalReplies += rep;
+
+        const s = Number(normalizeField(r, ['sentplural', 'inicios de sesión', 'inicios de sesion', 'enviadas', 'enviados', 'sent', 'total']) || 0);
+        const d = Number(normalizeField(r, ['deliveredplural', 'entregadas', 'entregados', 'delivered', 'recibidas']) || 0);
+        const rep = Number(normalizeField(r, ['answeredplural', 'respuestas', 'respondidas', 'replies', 'contestadas']) || 0);
+
+        if (s > 0 || d > 0 || rep > 0) {
+          hasAggregatedCols = true;
+          sumSent += s;
+          sumDelivered += d;
+          sumReplies += rep;
+        }
+
+        if (!detectedChannel) {
+          const ch = normalizeField(r, ['línea whatsapp', 'linea whatsapp', 'línea', 'linea', 'canal', 'channel']);
+          if (ch) detectedChannel = String(ch);
+        }
       });
+
+      if (hasAggregatedCols && (sumSent > 0 || sumDelivered > 0 || sumReplies > 0)) {
+        totalSent = sumSent;
+        totalDelivered = sumDelivered > 0 ? sumDelivered : Math.round(sumSent * 0.98);
+        totalReplies = sumReplies;
+      } else {
+        // Reporte granular donde cada fila es una notificación/sesión iniciada por plantilla
+        let cSent = 0, cDelivered = 0, cReplies = 0;
+
+        rows.forEach(r => {
+          if (!r || typeof r !== 'object') return;
+
+          const st = String(normalizeField(r, ['estado', 'status', 'state', 'sesiones por estados', 'estado de sesión', 'estado de sesion']) || '').toLowerCase();
+          const ans = String(normalizeField(r, ['respuestas de usuarios', 'respuesta', 'answered', 'replied']) || '').toLowerCase();
+
+          // Enviadas
+          if (!st.includes('notsent') && !st.includes('no enviad')) {
+            cSent++;
+          }
+
+          // Entregadas (delivered, read, answered, entregada, leida, respondida)
+          if (st.includes('deliver') || st.includes('read') || st.includes('answer') || st.includes('entregad') || st.includes('leid') || st.includes('respond')) {
+            cDelivered++;
+          }
+
+          // Respuestas
+          if (st.includes('answer') || st.includes('respond') || ans === 'sí' || ans === 'si' || ans === 'yes' || ans === 'true' || ans === '1') {
+            cReplies++;
+          }
+        });
+
+        totalSent = cSent > 0 ? cSent : rows.length;
+        totalDelivered = cDelivered > 0 ? cDelivered : Math.round(totalSent * 0.98);
+        totalReplies = cReplies;
+      }
+
+      let suggestedName = '';
+      if (detectedChannel) {
+        suggestedName = detectedChannel.split('-')[0].replace(/([A-Z])/g, ' $1').trim();
+      }
 
       return {
         fileName,
+        suggestedName,
         sent: totalSent,
         delivered: totalDelivered,
         replies: totalReplies
@@ -1044,15 +1138,98 @@
       };
     }
 
+    // CORRELACIÓN Y RENDERIZADO DEL MODAL CONSOLIDADO
+    function renderIngestModal() {
+      const nameEl = document.getElementById('inp-client-name');
+      const idEl = document.getElementById('inp-client-id');
+      const dateEl = document.getElementById('inp-client-date');
+      const prevSessEl = document.getElementById('inp-client-prev-sessions');
+
+      const tSentEl = document.getElementById('inp-client-templates-sent');
+      const tDelEl = document.getElementById('inp-client-templates-delivered');
+      const tRepEl = document.getElementById('inp-client-templates-replies');
+
+      const lblSessFile = document.getElementById('lbl-sessions-file');
+      const lblSessStats = document.getElementById('lbl-sessions-stats');
+      const lblTplFile = document.getElementById('lbl-templates-file');
+      const lblTplStats = document.getElementById('lbl-templates-stats');
+
+      // 1. Integrar Datos de Sesiones
+      if (pendingSessionsData) {
+        if (nameEl) {
+          nameEl.value = pendingSessionsData.suggestedName;
+        }
+        if (idEl) {
+          idEl.value = `CLI-${pendingSessionsData.suggestedName.toUpperCase().replace(/[^A-Z0-9]/g, '-').slice(0, 10)}`;
+        }
+        if (dateEl && pendingSessionsData.reportDate) {
+          dateEl.value = pendingSessionsData.reportDate;
+        }
+        if (prevSessEl && (!prevSessEl.value || prevSessEl.value === '0')) {
+          prevSessEl.value = pendingSessionsData.sessions;
+        }
+
+        if (lblSessFile) lblSessFile.textContent = pendingSessionsData.fileName;
+        if (lblSessStats) lblSessStats.textContent = `${pendingSessionsData.sessions.toLocaleString()} sesiones | ${(pendingSessionsData.userMsgs + pendingSessionsData.botMsgs + pendingSessionsData.agentMsgs).toLocaleString()} mensajes`;
+
+        document.getElementById('sum-sessions').textContent = pendingSessionsData.sessions.toLocaleString();
+        document.getElementById('sum-user-msgs').textContent = pendingSessionsData.userMsgs.toLocaleString();
+        document.getElementById('sum-bot-msgs').textContent = pendingSessionsData.botMsgs.toLocaleString();
+        document.getElementById('sum-agent-msgs').textContent = pendingSessionsData.agentMsgs.toLocaleString();
+      } else {
+        if (lblSessFile) lblSessFile.textContent = "Sin adjuntar aún (haz clic en Adjuntar Sesiones)";
+        if (lblSessStats) lblSessStats.textContent = "0 sesiones";
+        document.getElementById('sum-sessions').textContent = '0';
+        document.getElementById('sum-user-msgs').textContent = '0';
+        document.getElementById('sum-bot-msgs').textContent = '0';
+        document.getElementById('sum-agent-msgs').textContent = '0';
+      }
+
+      // 2. Integrar Datos de Plantillas
+      if (pendingTemplatesData) {
+        if (tSentEl) tSentEl.value = pendingTemplatesData.sent;
+        if (tDelEl) tDelEl.value = pendingTemplatesData.delivered;
+        if (tRepEl) tRepEl.value = pendingTemplatesData.replies;
+
+        const rate = pendingTemplatesData.delivered > 0 
+          ? ((pendingTemplatesData.replies / pendingTemplatesData.delivered) * 100).toFixed(1) 
+          : 0;
+
+        if (lblTplFile) lblTplFile.textContent = pendingTemplatesData.fileName;
+        if (lblTplStats) lblTplStats.textContent = `${pendingTemplatesData.sent.toLocaleString()} env | ${pendingTemplatesData.delivered.toLocaleString()} entregadas | ${pendingTemplatesData.replies.toLocaleString()} resp (${rate}%)`;
+
+        // Si aún no hay nombre asignado y no hay archivo de sesiones
+        if (!pendingSessionsData && nameEl && (!nameEl.value || nameEl.value.includes('sessionStartingCauses'))) {
+          nameEl.value = pendingTemplatesData.suggestedName || '';
+          nameEl.placeholder = 'Ingresa el nombre del cliente (ej. Asesores Mena)';
+        }
+      } else {
+        if (lblTplFile) lblTplFile.textContent = "Sin archivo adjunto (opcional)";
+        if (lblTplStats) lblTplStats.textContent = "--";
+      }
+
+      // 3. Buffer Consolidado Listo para Ingesta
+      pendingClientData = {
+        suggestedName: nameEl?.value || 'Cliente',
+        sessions: pendingSessionsData?.sessions || 0,
+        userMsgs: pendingSessionsData?.userMsgs || 0,
+        botMsgs: pendingSessionsData?.botMsgs || 0,
+        agentMsgs: pendingSessionsData?.agentMsgs || 0,
+        templatesSent: pendingTemplatesData?.sent || Number(tSentEl?.value || 0),
+        templatesDelivered: pendingTemplatesData?.delivered || Number(tDelEl?.value || 0),
+        templatesReplies: pendingTemplatesData?.replies || Number(tRepEl?.value || 0),
+        reportDate: dateEl?.value || new Date().toISOString().split('T')[0]
+      };
+
+      document.getElementById('ingest-modal')?.classList.remove('hidden');
+    }
+
     async function handleIncomingFiles(filesList) {
       if (!filesList || !filesList.length) return;
       showToast(`⏳ Analizando ${filesList.length} archivo(s)...`);
 
       try {
         const parsedResults = await Promise.all(Array.from(filesList).map(parseFilePromise));
-        
-        let sessionsData = null;
-        let templatesData = null;
 
         for (const item of parsedResults) {
           const file = item.file;
@@ -1060,105 +1237,40 @@
           if (!rows.length) continue;
 
           if (isTemplatesFile(rows, file.name)) {
-            templatesData = processTemplatesRows(rows, file.name);
+            pendingTemplatesData = processTemplatesRows(rows, file.name);
           } else {
-            sessionsData = processSessionsRows(rows, file.name);
+            pendingSessionsData = processSessionsRows(rows, file.name);
           }
         }
 
-        if (!sessionsData && parsedResults.length > 0 && parsedResults[0].results?.data?.length) {
-          const item = parsedResults[0];
-          if (!templatesData || item.file.name !== templatesData.fileName) {
-            sessionsData = processSessionsRows(item.results.data, item.file.name);
-          }
+        renderIngestModal();
+
+        if (pendingSessionsData && pendingTemplatesData) {
+          showToast("✨ Sesiones y Plantillas correlacionadas con éxito");
+        } else if (pendingSessionsData) {
+          showToast("📊 Archivo de sesiones procesado");
+        } else if (pendingTemplatesData) {
+          showToast("📨 Reporte de plantillas procesado");
         }
-
-        if (!sessionsData && !templatesData) {
-          showToast("⚠️ No se encontraron datos válidos en los archivos seleccionados.");
-          return;
-        }
-
-        const baseSessions = sessionsData || {
-          fileName: 'Archivo de Sesiones',
-          suggestedName: templatesData?.fileName ? templatesData.fileName.replace(/\.(csv|tsv|txt)$/i, '') : 'Cliente',
-          sessions: 0,
-          userMsgs: 0,
-          botMsgs: 0,
-          agentMsgs: 0,
-          reportDate: new Date().toISOString().split('T')[0]
-        };
-
-        const baseTemplates = templatesData || {
-          fileName: null,
-          sent: 0,
-          delivered: 0,
-          replies: 0
-        };
-
-        pendingClientData = {
-          ...baseSessions,
-          templatesSent: baseTemplates.sent,
-          templatesDelivered: baseTemplates.delivered,
-          templatesReplies: baseTemplates.replies
-        };
-
-        const nameEl = document.getElementById('inp-client-name');
-        if (nameEl) nameEl.value = baseSessions.suggestedName;
-
-        const idEl = document.getElementById('inp-client-id');
-        if (idEl) idEl.value = `CLI-${baseSessions.suggestedName.toUpperCase().replace(/[^A-Z0-9]/g, '-').slice(0, 10)}`;
-
-        const dateEl = document.getElementById('inp-client-date');
-        if (dateEl) dateEl.value = baseSessions.reportDate;
-
-        const prevSessEl = document.getElementById('inp-client-prev-sessions');
-        if (prevSessEl) prevSessEl.value = baseSessions.sessions;
-
-        const tSentEl = document.getElementById('inp-client-templates-sent');
-        if (tSentEl) tSentEl.value = baseTemplates.sent;
-        const tDelEl = document.getElementById('inp-client-templates-delivered');
-        if (tDelEl) tDelEl.value = baseTemplates.delivered;
-        const tRepEl = document.getElementById('inp-client-templates-replies');
-        if (tRepEl) tRepEl.value = baseTemplates.replies;
-
-        const lblSessFile = document.getElementById('lbl-sessions-file');
-        const lblSessStats = document.getElementById('lbl-sessions-stats');
-        if (lblSessFile && lblSessStats) {
-          if (sessionsData) {
-            lblSessFile.textContent = sessionsData.fileName;
-            lblSessStats.textContent = `${sessionsData.sessions.toLocaleString()} sesiones | ${(sessionsData.userMsgs + sessionsData.botMsgs + sessionsData.agentMsgs).toLocaleString()} msgs`;
-          } else {
-            lblSessFile.textContent = "No adjuntado (0 sesiones)";
-            lblSessStats.textContent = "0";
-          }
-        }
-
-        const lblTplFile = document.getElementById('lbl-templates-file');
-        const lblTplStats = document.getElementById('lbl-templates-stats');
-        if (lblTplFile && lblTplStats) {
-          if (templatesData && templatesData.fileName) {
-            const replyPct = templatesData.delivered > 0 ? ((templatesData.replies / templatesData.delivered) * 100).toFixed(1) : 0;
-            lblTplFile.textContent = templatesData.fileName;
-            lblTplStats.textContent = `${templatesData.sent.toLocaleString()} env | ${templatesData.replies.toLocaleString()} resp (${replyPct}%)`;
-          } else {
-            lblTplFile.textContent = "Sin archivo adjunto (puedes cargarlo o tipear valores)";
-            lblTplStats.textContent = "--";
-          }
-        }
-
-        document.getElementById('sum-sessions').textContent = baseSessions.sessions.toLocaleString();
-        document.getElementById('sum-user-msgs').textContent = baseSessions.userMsgs.toLocaleString();
-        document.getElementById('sum-bot-msgs').textContent = baseSessions.botMsgs.toLocaleString();
-        document.getElementById('sum-agent-msgs').textContent = baseSessions.agentMsgs.toLocaleString();
-
-        document.getElementById('ingest-modal')?.classList.remove('hidden');
-        showToast(templatesData && sessionsData ? "✅ Sesiones y Plantillas consolidadas con éxito" : "✅ Archivo analizado correctamente");
       } catch (err) {
         console.error("Error en handleIncomingFiles:", err);
         showToast("❌ Error al procesar los archivos");
       }
     }
 
+
+
+    function resetIngestBuffers() {
+      pendingClientData = null;
+      pendingSessionsData = null;
+      pendingTemplatesData = null;
+      const fInp = document.getElementById('file-input');
+      if (fInp) fInp.value = '';
+      const sInp = document.getElementById('inp-modal-sessions-file');
+      if (sInp) sInp.value = '';
+      const tInp = document.getElementById('inp-modal-templates-file');
+      if (tInp) tInp.value = '';
+    }
 
     // BOTÓN GUARDAR MODAL INGESTA
     document.getElementById('btn-save-ingest').onclick = async () => {
@@ -1206,7 +1318,7 @@
         if (res.ok) {
           showToast(`✅ Cliente "${name}" guardado exitosamente en la cartera`);
           document.getElementById('ingest-modal')?.classList.add('hidden');
-          pendingClientData = null;
+          resetIngestBuffers();
           await fetchClients();
         } else {
           showToast("❌ Error al guardar en base de datos");
@@ -1219,11 +1331,11 @@
 
     document.getElementById('btn-cancel-ingest').onclick = () => {
       document.getElementById('ingest-modal')?.classList.add('hidden');
-      pendingClientData = null;
+      resetIngestBuffers();
     };
     document.getElementById('close-ingest-modal-btn').onclick = () => {
       document.getElementById('ingest-modal')?.classList.add('hidden');
-      pendingClientData = null;
+      resetIngestBuffers();
     };
 
     // ELIMINAR UN CLIENTE
@@ -1278,6 +1390,23 @@
       }
     });
 
+    // Adjuntar archivo de sesiones dentro del modal abierto
+    document.getElementById('inp-modal-sessions-file')?.addEventListener('change', async function(e) {
+      if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        showToast(`⏳ Procesando reporte de sesiones: ${file.name}...`);
+        const { results } = await parseFilePromise(file);
+        if (results && results.data && results.data.length) {
+          pendingSessionsData = processSessionsRows(results.data, file.name);
+          renderIngestModal();
+          showToast(`✅ Sesiones vinculadas: ${pendingSessionsData.sessions.toLocaleString()} sesiones`);
+        } else {
+          showToast("⚠️ El archivo de sesiones no contiene filas válidas");
+        }
+      }
+      e.target.value = '';
+    });
+
     // Adjuntar archivo de plantillas directamente dentro del modal abierto
     document.getElementById('inp-modal-templates-file')?.addEventListener('change', async function(e) {
       if (e.target.files && e.target.files.length > 0) {
@@ -1285,24 +1414,9 @@
         showToast(`⏳ Procesando reporte de plantillas: ${file.name}...`);
         const { results } = await parseFilePromise(file);
         if (results && results.data && results.data.length) {
-          const tData = processTemplatesRows(results.data, file.name);
-          document.getElementById('inp-client-templates-sent').value = tData.sent;
-          document.getElementById('inp-client-templates-delivered').value = tData.delivered;
-          document.getElementById('inp-client-templates-replies').value = tData.replies;
-
-          const replyPct = tData.delivered > 0 ? ((tData.replies / tData.delivered) * 100).toFixed(1) : 0;
-          const lblTplFile = document.getElementById('lbl-templates-file');
-          const lblTplStats = document.getElementById('lbl-templates-stats');
-          if (lblTplFile) lblTplFile.textContent = tData.fileName;
-          if (lblTplStats) lblTplStats.textContent = `${tData.sent.toLocaleString()} env | ${tData.replies.toLocaleString()} resp (${replyPct}%)`;
-
-          if (pendingClientData) {
-            pendingClientData.templatesSent = tData.sent;
-            pendingClientData.templatesDelivered = tData.delivered;
-            pendingClientData.templatesReplies = tData.replies;
-          }
-
-          showToast("✅ Métricas de plantillas actualizadas desde el archivo");
+          pendingTemplatesData = processTemplatesRows(results.data, file.name);
+          renderIngestModal();
+          showToast(`✅ Plantillas vinculadas: ${pendingTemplatesData.sent.toLocaleString()} enviadas | ${pendingTemplatesData.replies.toLocaleString()} respuestas`);
         } else {
           showToast("⚠️ El archivo de plantillas no contiene datos válidos");
         }
