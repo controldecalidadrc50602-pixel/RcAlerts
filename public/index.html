@@ -278,16 +278,22 @@
         <div class="card">
           <h3 style="font-size: 15px; font-weight: 700;">📥 Ingesta de Archivos por Cliente (CSV o TSV)</h3>
           <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
-            Arrastra el archivo de sesiones de un cliente (ej. export de Botmaker o WhatsApp). Se abrirá una ventana para confirmar el <strong>Nombre del Cliente</strong>, la <strong>Fecha</strong> y métricas de plantillas antes de guardarlo.
+            Arrastra el archivo de <strong>Sesiones</strong> y/o el de <strong>Plantillas Outbound</strong> de Botmaker (CSV o TSV). Se detectarán automáticamente y se abrirá la ventana para consolidar los datos de la cuenta.
           </p>
           
           <div class="drop-box" id="drop-zone">
-            <input type="file" id="file-input" accept=".csv,.tsv,.txt">
-            <div style="font-size: 26px; margin-bottom: 4px;">📂</div>
-            <p style="font-size: 13px; font-weight: 600; color: var(--text-main);">
-              Arrastra aquí el archivo <span style="color: var(--primary);">.TSV</span> o <span style="color: var(--primary);">.CSV</span> del cliente
+            <input type="file" id="file-input" accept=".csv,.tsv,.txt" multiple>
+            <div style="font-size: 28px; margin-bottom: 4px;">📂📥</div>
+            <p style="font-size: 13px; font-weight: 700; color: var(--text-main);">
+              Arrastra aquí 1 o ambos archivos (<span style="color: var(--primary);">Sesiones</span> + <span style="color: #7e22ce;">Plantillas</span>)
             </p>
-            <p style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Totaliza automáticamente sesiones y mensajes de la cuenta</p>
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+              Soporta selección simultánea o archivos sueltos. Mapeo inteligente de métricas.
+            </p>
+            <div style="display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap;">
+              <span class="badge" style="background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; font-size: 10px;">📊 Reporte Sesiones / Chats</span>
+              <span class="badge" style="background: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff; font-size: 10px;">📨 Reporte Plantillas Outbound</span>
+            </div>
           </div>
         </div>
 
@@ -419,8 +425,20 @@
         <div style="display: flex; align-items: center; gap: 10px;">
           <div style="font-size: 24px;">📥</div>
           <div>
-            <h2 style="font-size: 18px; font-weight: 800;">Consolidar Archivo de Cliente</h2>
+            <h2 style="font-size: 18px; font-weight: 800;">Consolidar Archivos de Cliente</h2>
             <p style="font-size: 12px; color: var(--text-muted);">Confirma el nombre de la cuenta y el período antes de guardarlo en la cartera</p>
+          </div>
+        </div>
+
+        <!-- BADGES DE ARCHIVOS DETECTADOS -->
+        <div id="ingest-files-summary" style="margin: 12px 0; display: flex; flex-direction: column; gap: 6px;">
+          <div id="file-badge-sessions" style="font-size: 11px; padding: 6px 12px; border-radius: 8px; background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; display: flex; align-items: center; justify-content: space-between;">
+            <span>📊 <strong>Sesiones:</strong> <span id="lbl-sessions-file">Detectando...</span></span>
+            <span id="lbl-sessions-stats" style="font-weight: 700; font-family: monospace;"></span>
+          </div>
+          <div id="file-badge-templates" style="font-size: 11px; padding: 6px 12px; border-radius: 8px; background: #faf5ff; color: #6b21a8; border: 1px solid #e9d5ff; display: flex; align-items: center; justify-content: space-between;">
+            <span>📨 <strong>Plantillas:</strong> <span id="lbl-templates-file">Sin archivo adjunto</span></span>
+            <span id="lbl-templates-stats" style="font-weight: 700; font-family: monospace;"></span>
           </div>
         </div>
 
@@ -464,7 +482,13 @@
 
           <!-- SECCIÓN PLANTILLAS OUTBOUND -->
           <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 10px; padding: 12px; margin-top: 6px;">
-            <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #6b21a8; margin-bottom: 8px;">Métricas Outbound de Plantillas WhatsApp (Opcional)</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+              <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #6b21a8;">Métricas Outbound de Plantillas WhatsApp</h4>
+              <label for="inp-modal-templates-file" class="btn btn-default" style="font-size: 10px; padding: 4px 8px; cursor: pointer;">
+                📎 Cargar / Adjuntar CSV de Plantillas
+              </label>
+              <input type="file" id="inp-modal-templates-file" accept=".csv,.tsv,.txt" style="display: none;">
+            </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
               <div class="form-group">
                 <label class="form-label" style="font-size: 10px;">Enviadas</label>
@@ -923,98 +947,218 @@
       }
     }
 
-    async function handleIncomingFile(file) {
-      if (!file) return;
+    function isTemplatesFile(rows, fileName) {
+      const fName = (fileName || '').toLowerCase();
+      if (fName.includes('plantilla') || fName.includes('template') || fName.includes('hsm') || fName.includes('outbound')) {
+        return true;
+      }
+      if (!rows || !rows.length) return false;
+      const sample = rows[0];
+      const keys = Object.keys(sample).map(k => String(k).toLowerCase());
+      const hasTemplateCols = keys.some(k => 
+        k.includes('plantilla') || k.includes('template') || 
+        k.includes('enviad') || k.includes('entregad') || 
+        k.includes('leíd') || k.includes('leid') || 
+        k.includes('respuest') || k.includes('repli') || k.includes('respond')
+      );
+      const hasSessionCols = keys.some(k => 
+        k.includes('sesion') || k.includes('session') || 
+        k.includes('mensajes usuario') || k.includes('mensajes bot') || k.includes('mensajes agente')
+      );
+      return hasTemplateCols && !hasSessionCols;
+    }
+
+    function processTemplatesRows(rows, fileName) {
+      let totalSent = 0;
+      let totalDelivered = 0;
+      let totalReplies = 0;
+
+      rows.forEach(r => {
+        if (!r || typeof r !== 'object') return;
+        const s = Number(normalizeField(r, ['enviadas', 'enviados', 'sent', 'total enviados', 'mensajes enviados', 'cantidad']) || 0);
+        const d = Number(normalizeField(r, ['entregadas', 'entregados', 'delivered', 'recibidas', 'recibidos']) || 0);
+        const rep = Number(normalizeField(r, ['respuestas', 'respondidas', 'respondidos', 'replies', 'replied', 'contestadas']) || 0);
+        totalSent += s;
+        totalDelivered += d;
+        totalReplies += rep;
+      });
+
+      return {
+        fileName,
+        sent: totalSent,
+        delivered: totalDelivered,
+        replies: totalReplies
+      };
+    }
+
+    function processSessionsRows(rows, fileName) {
+      const cleanFileName = fileName ? fileName.replace(/\.(csv|tsv|txt)$/i, '') : 'Cliente';
+      let totalSessions = rows.length;
+      let totalUserMsgs = 0;
+      let totalBotMsgs = 0;
+      let totalAgentMsgs = 0;
+      let detectedDates = [];
+      let detectedChannel = '';
+
+      rows.forEach(r => {
+        if (!r || typeof r !== 'object') return;
+        const u = Number(normalizeField(r, ['mensajes usuario', 'user messages', 'inbound']) || 0);
+        const b = Number(normalizeField(r, ['mensajes bot', 'bot messages', 'bot']) || 0);
+        const a = Number(normalizeField(r, ['mensajes agente', 'agent messages', 'agente']) || 0);
+        totalUserMsgs += u;
+        totalBotMsgs += b;
+        totalAgentMsgs += a;
+
+        const f = normalizeField(r, ['fecha sesion', 'fecha', 'date']);
+        if (f) detectedDates.push(String(f).split('T')[0]);
+
+        if (!detectedChannel) {
+          const ch = normalizeField(r, ['id canal', 'canal', 'channel']);
+          if (ch) detectedChannel = String(ch);
+        }
+      });
+
+      let suggestedName = cleanFileName;
+      if (detectedChannel) {
+        const parts = detectedChannel.split('-');
+        if (parts[0]) {
+          suggestedName = parts[0]
+            .replace(/([A-Z])/g, ' $1')
+            .replace(/^./, str => str.toUpperCase())
+            .trim();
+          if (suggestedName.toLowerCase() === 'asesoresmena') suggestedName = 'Asesores Mena';
+        }
+      }
+
+      detectedDates.sort();
+      const latestDate = detectedDates.length ? detectedDates[detectedDates.length - 1] : new Date().toISOString().split('T')[0];
+
+      return {
+        fileName: cleanFileName,
+        suggestedName,
+        sessions: totalSessions,
+        userMsgs: totalUserMsgs,
+        botMsgs: totalBotMsgs,
+        agentMsgs: totalAgentMsgs,
+        reportDate: latestDate
+      };
+    }
+
+    async function handleIncomingFiles(filesList) {
+      if (!filesList || !filesList.length) return;
+      showToast(`⏳ Analizando ${filesList.length} archivo(s)...`);
 
       try {
-        showToast("⏳ Analizando archivo del cliente...");
-        const { results } = await parseFilePromise(file);
+        const parsedResults = await Promise.all(Array.from(filesList).map(parseFilePromise));
+        
+        let sessionsData = null;
+        let templatesData = null;
 
-        if (!results || !results.data || !results.data.length) {
-          showToast("⚠️ El archivo está vacío o no tiene formato válido");
+        for (const item of parsedResults) {
+          const file = item.file;
+          const rows = item.results?.data || [];
+          if (!rows.length) continue;
+
+          if (isTemplatesFile(rows, file.name)) {
+            templatesData = processTemplatesRows(rows, file.name);
+          } else {
+            sessionsData = processSessionsRows(rows, file.name);
+          }
+        }
+
+        if (!sessionsData && parsedResults.length > 0 && parsedResults[0].results?.data?.length) {
+          const item = parsedResults[0];
+          if (!templatesData || item.file.name !== templatesData.fileName) {
+            sessionsData = processSessionsRows(item.results.data, item.file.name);
+          }
+        }
+
+        if (!sessionsData && !templatesData) {
+          showToast("⚠️ No se encontraron datos válidos en los archivos seleccionados.");
           return;
         }
 
-        const rows = results.data;
-        const cleanFileName = file.name ? file.name.replace(/\.(csv|tsv|txt)$/i, '') : 'Cliente';
+        const baseSessions = sessionsData || {
+          fileName: 'Archivo de Sesiones',
+          suggestedName: templatesData?.fileName ? templatesData.fileName.replace(/\.(csv|tsv|txt)$/i, '') : 'Cliente',
+          sessions: 0,
+          userMsgs: 0,
+          botMsgs: 0,
+          agentMsgs: 0,
+          reportDate: new Date().toISOString().split('T')[0]
+        };
 
-        let totalSessions = rows.length;
-        let totalUserMsgs = 0;
-        let totalBotMsgs = 0;
-        let totalAgentMsgs = 0;
-        let detectedDates = [];
-        let detectedChannel = '';
+        const baseTemplates = templatesData || {
+          fileName: null,
+          sent: 0,
+          delivered: 0,
+          replies: 0
+        };
 
-        rows.forEach(r => {
-          if (!r || typeof r !== 'object') return;
-          const u = Number(normalizeField(r, ['mensajes usuario', 'user messages', 'inbound']) || 0);
-          const b = Number(normalizeField(r, ['mensajes bot', 'bot messages', 'bot']) || 0);
-          const a = Number(normalizeField(r, ['mensajes agente', 'agent messages', 'agente']) || 0);
-          totalUserMsgs += u;
-          totalBotMsgs += b;
-          totalAgentMsgs += a;
+        pendingClientData = {
+          ...baseSessions,
+          templatesSent: baseTemplates.sent,
+          templatesDelivered: baseTemplates.delivered,
+          templatesReplies: baseTemplates.replies
+        };
 
-          const f = normalizeField(r, ['fecha sesion', 'fecha', 'date']);
-          if (f) detectedDates.push(String(f).split('T')[0]);
+        const nameEl = document.getElementById('inp-client-name');
+        if (nameEl) nameEl.value = baseSessions.suggestedName;
 
-          if (!detectedChannel) {
-            const ch = normalizeField(r, ['id canal', 'canal', 'channel']);
-            if (ch) detectedChannel = String(ch);
-          }
-        });
+        const idEl = document.getElementById('inp-client-id');
+        if (idEl) idEl.value = `CLI-${baseSessions.suggestedName.toUpperCase().replace(/[^A-Z0-9]/g, '-').slice(0, 10)}`;
 
-        // Extraer nombre sugerido del cliente a partir del canal o nombre de archivo
-        let suggestedName = cleanFileName;
-        if (detectedChannel) {
-          const parts = detectedChannel.split('-');
-          if (parts[0]) {
-            suggestedName = parts[0]
-              .replace(/([A-Z])/g, ' $1')
-              .replace(/^./, str => str.toUpperCase())
-              .trim();
-            if (suggestedName.toLowerCase() === 'asesoresmena') suggestedName = 'Asesores Mena';
+        const dateEl = document.getElementById('inp-client-date');
+        if (dateEl) dateEl.value = baseSessions.reportDate;
+
+        const prevSessEl = document.getElementById('inp-client-prev-sessions');
+        if (prevSessEl) prevSessEl.value = baseSessions.sessions;
+
+        const tSentEl = document.getElementById('inp-client-templates-sent');
+        if (tSentEl) tSentEl.value = baseTemplates.sent;
+        const tDelEl = document.getElementById('inp-client-templates-delivered');
+        if (tDelEl) tDelEl.value = baseTemplates.delivered;
+        const tRepEl = document.getElementById('inp-client-templates-replies');
+        if (tRepEl) tRepEl.value = baseTemplates.replies;
+
+        const lblSessFile = document.getElementById('lbl-sessions-file');
+        const lblSessStats = document.getElementById('lbl-sessions-stats');
+        if (lblSessFile && lblSessStats) {
+          if (sessionsData) {
+            lblSessFile.textContent = sessionsData.fileName;
+            lblSessStats.textContent = `${sessionsData.sessions.toLocaleString()} sesiones | ${(sessionsData.userMsgs + sessionsData.botMsgs + sessionsData.agentMsgs).toLocaleString()} msgs`;
+          } else {
+            lblSessFile.textContent = "No adjuntado (0 sesiones)";
+            lblSessStats.textContent = "0";
           }
         }
 
-        // Fecha más reciente detectada o la fecha de hoy
-        detectedDates.sort();
-        const latestDate = detectedDates.length ? detectedDates[detectedDates.length - 1] : new Date().toISOString().split('T')[0];
+        const lblTplFile = document.getElementById('lbl-templates-file');
+        const lblTplStats = document.getElementById('lbl-templates-stats');
+        if (lblTplFile && lblTplStats) {
+          if (templatesData && templatesData.fileName) {
+            const replyPct = templatesData.delivered > 0 ? ((templatesData.replies / templatesData.delivered) * 100).toFixed(1) : 0;
+            lblTplFile.textContent = templatesData.fileName;
+            lblTplStats.textContent = `${templatesData.sent.toLocaleString()} env | ${templatesData.replies.toLocaleString()} resp (${replyPct}%)`;
+          } else {
+            lblTplFile.textContent = "Sin archivo adjunto (puedes cargarlo o tipear valores)";
+            lblTplStats.textContent = "--";
+          }
+        }
 
-        // Almacenar en buffer
-        pendingClientData = {
-          suggestedName,
-          fileName: cleanFileName,
-          sessions: totalSessions,
-          userMsgs: totalUserMsgs,
-          botMsgs: totalBotMsgs,
-          agentMsgs: totalAgentMsgs,
-          reportDate: latestDate
-        };
-
-        // Rellenar formulario del modal
-        const nameEl = document.getElementById('inp-client-name');
-        if (nameEl) nameEl.value = suggestedName;
-
-        const idEl = document.getElementById('inp-client-id');
-        if (idEl) idEl.value = `CLI-${suggestedName.toUpperCase().replace(/[^A-Z0-9]/g, '-').slice(0, 10)}`;
-
-        const dateEl = document.getElementById('inp-client-date');
-        if (dateEl) dateEl.value = latestDate;
-
-        const prevSessEl = document.getElementById('inp-client-prev-sessions');
-        if (prevSessEl) prevSessEl.value = totalSessions;
-
-        document.getElementById('sum-sessions').textContent = totalSessions.toLocaleString();
-        document.getElementById('sum-user-msgs').textContent = totalUserMsgs.toLocaleString();
-        document.getElementById('sum-bot-msgs').textContent = totalBotMsgs.toLocaleString();
-        document.getElementById('sum-agent-msgs').textContent = totalAgentMsgs.toLocaleString();
+        document.getElementById('sum-sessions').textContent = baseSessions.sessions.toLocaleString();
+        document.getElementById('sum-user-msgs').textContent = baseSessions.userMsgs.toLocaleString();
+        document.getElementById('sum-bot-msgs').textContent = baseSessions.botMsgs.toLocaleString();
+        document.getElementById('sum-agent-msgs').textContent = baseSessions.agentMsgs.toLocaleString();
 
         document.getElementById('ingest-modal')?.classList.remove('hidden');
+        showToast(templatesData && sessionsData ? "✅ Sesiones y Plantillas consolidadas con éxito" : "✅ Archivo analizado correctamente");
       } catch (err) {
-        console.error("Error en handleIncomingFile:", err);
-        showToast("❌ Error al procesar el archivo");
+        console.error("Error en handleIncomingFiles:", err);
+        showToast("❌ Error al procesar los archivos");
       }
     }
+
 
     // BOTÓN GUARDAR MODAL INGESTA
     document.getElementById('btn-save-ingest').onclick = async () => {
@@ -1101,11 +1245,11 @@
     window.addEventListener('dragover', (e) => e.preventDefault(), false);
     window.addEventListener('drop', (e) => e.preventDefault(), false);
 
-    // File input & Drag & Drop
+    // File input & Drag & Drop con soporte dual
     const fileInput = document.getElementById('file-input');
     fileInput.addEventListener('change', async function(e) {
       if (e.target.files && e.target.files.length > 0) {
-        await handleIncomingFile(e.target.files[0]);
+        await handleIncomingFiles(e.target.files);
       }
       e.target.value = '';
     });
@@ -1130,9 +1274,42 @@
       e.stopPropagation();
       dropZone.classList.remove('dragover');
       if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        await handleIncomingFile(e.dataTransfer.files[0]);
+        await handleIncomingFiles(e.dataTransfer.files);
       }
     });
+
+    // Adjuntar archivo de plantillas directamente dentro del modal abierto
+    document.getElementById('inp-modal-templates-file')?.addEventListener('change', async function(e) {
+      if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        showToast(`⏳ Procesando reporte de plantillas: ${file.name}...`);
+        const { results } = await parseFilePromise(file);
+        if (results && results.data && results.data.length) {
+          const tData = processTemplatesRows(results.data, file.name);
+          document.getElementById('inp-client-templates-sent').value = tData.sent;
+          document.getElementById('inp-client-templates-delivered').value = tData.delivered;
+          document.getElementById('inp-client-templates-replies').value = tData.replies;
+
+          const replyPct = tData.delivered > 0 ? ((tData.replies / tData.delivered) * 100).toFixed(1) : 0;
+          const lblTplFile = document.getElementById('lbl-templates-file');
+          const lblTplStats = document.getElementById('lbl-templates-stats');
+          if (lblTplFile) lblTplFile.textContent = tData.fileName;
+          if (lblTplStats) lblTplStats.textContent = `${tData.sent.toLocaleString()} env | ${tData.replies.toLocaleString()} resp (${replyPct}%)`;
+
+          if (pendingClientData) {
+            pendingClientData.templatesSent = tData.sent;
+            pendingClientData.templatesDelivered = tData.delivered;
+            pendingClientData.templatesReplies = tData.replies;
+          }
+
+          showToast("✅ Métricas de plantillas actualizadas desde el archivo");
+        } else {
+          showToast("⚠️ El archivo de plantillas no contiene datos válidos");
+        }
+      }
+      e.target.value = '';
+    });
+
 
     // MODAL DETALLE
     function openClientModal(client) {

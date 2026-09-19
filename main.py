@@ -32,6 +32,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class VercelPathMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            path = scope.get("path", "")
+            # Si Vercel reescribe hacia /api/index.py o /index.py, recuperar ruta original
+            if path in ("/api/index.py", "/index.py", "/api", "/api/"):
+                headers = dict(scope.get("headers", []))
+                matched = headers.get(b"x-matched-path", b"").decode("utf-8", errors="replace")
+                if matched:
+                    scope["path"] = matched
+                else:
+                    forwarded = headers.get(b"x-forwarded-uri", b"").decode("utf-8", errors="replace")
+                    if forwarded:
+                        scope["path"] = forwarded.split("?")[0]
+        await self.app(scope, receive, send)
+
+app.add_middleware(VercelPathMiddleware)
+
+
 class IngestClientItem(BaseModel):
     id: Optional[str] = None
     name: str
