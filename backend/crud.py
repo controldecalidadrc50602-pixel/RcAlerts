@@ -219,35 +219,62 @@ def get_clients_with_latest_metric(db: Session, period: str = None):
     portfolio_total_msgs = 0
 
     temp_list = []
-    for c in clients:
-        # Si se especifica período (ej. '2026-04-30' o '2026-04'), buscar la métrica correspondiente
-        target_metric = None
-        if period:
-            for m in c.metrics:
-                if str(m.report_date) == period or str(m.report_date).startswith(period):
-                    target_metric = m
-                    break
-        if not target_metric:
-            target_metric = c.metrics[0] if c.metrics else None
+    if period == "all":
+        # Desglose histórico multimes: incluir todas las métricas de todos los clientes
+        for c in clients:
+            m_sorted = sorted(c.metrics, key=lambda x: x.report_date)
+            for idx, m in enumerate(m_sorted):
+                sessions = m.sessions or 0
+                prev_m = m_sorted[idx - 1] if idx > 0 else None
+                prev_sessions = prev_m.sessions if prev_m else (m.prev_sessions or sessions)
+                user_msgs = m.user_msgs or 0
+                bot_msgs = m.bot_msgs or 0
+                agent_msgs = m.agent_msgs or 0
+                total_msgs = user_msgs + bot_msgs + agent_msgs
 
-        sessions = target_metric.sessions if target_metric else 0
-        user_msgs = target_metric.user_msgs if target_metric else 0
-        bot_msgs = target_metric.bot_msgs if target_metric else 0
-        agent_msgs = target_metric.agent_msgs if target_metric else 0
-        total_msgs = user_msgs + bot_msgs + agent_msgs
+                portfolio_total_sessions += sessions
+                portfolio_total_msgs += total_msgs
 
-        portfolio_total_sessions += sessions
-        portfolio_total_msgs += total_msgs
+                temp_list.append({
+                    "client": c,
+                    "metric": m,
+                    "sessions": sessions,
+                    "prev_sessions": prev_sessions,
+                    "user_msgs": user_msgs,
+                    "bot_msgs": bot_msgs,
+                    "agent_msgs": agent_msgs,
+                    "total_msgs": total_msgs
+                })
+    else:
+        for c in clients:
+            target_metric = None
+            if period:
+                for m in c.metrics:
+                    if str(m.report_date) == period or str(m.report_date).startswith(period):
+                        target_metric = m
+                        break
+            if not target_metric:
+                target_metric = c.metrics[0] if c.metrics else None
 
-        temp_list.append({
-            "client": c,
-            "metric": target_metric,
-            "sessions": sessions,
-            "user_msgs": user_msgs,
-            "bot_msgs": bot_msgs,
-            "agent_msgs": agent_msgs,
-            "total_msgs": total_msgs
-        })
+            sessions = target_metric.sessions if target_metric else 0
+            user_msgs = target_metric.user_msgs if target_metric else 0
+            bot_msgs = target_metric.bot_msgs if target_metric else 0
+            agent_msgs = target_metric.agent_msgs if target_metric else 0
+            total_msgs = user_msgs + bot_msgs + agent_msgs
+
+            portfolio_total_sessions += sessions
+            portfolio_total_msgs += total_msgs
+
+            temp_list.append({
+                "client": c,
+                "metric": target_metric,
+                "sessions": sessions,
+                "prev_sessions": target_metric.prev_sessions if target_metric else sessions,
+                "user_msgs": user_msgs,
+                "bot_msgs": bot_msgs,
+                "agent_msgs": agent_msgs,
+                "total_msgs": total_msgs
+            })
 
     results = []
     for item in temp_list:
@@ -322,6 +349,55 @@ def get_clients_with_latest_metric(db: Session, period: str = None):
         })
 
     return results
+
+def get_portfolio_history(db: Session):
+    """
+    Retorna la serie cronológica consolidada de toda la cartera agrupada por report_date
+    """
+    from collections import defaultdict
+    metrics = db.query(WeeklyMetric).order_by(WeeklyMetric.report_date.asc()).all()
+    if not metrics:
+        return []
+        
+    by_date = defaultdict(lambda: {
+        "report_date": "",
+        "sessions": 0,
+        "user_msgs": 0,
+        "bot_msgs": 0,
+        "agent_msgs": 0,
+        "total_msgs": 0,
+        "templates_sent": 0,
+        "templates_delivered": 0,
+        "templates_replies": 0,
+        "clients_count": 0
+    })
+    
+    for m in metrics:
+        d_str = str(m.report_date)
+        entry = by_date[d_str]
+        entry["report_date"] = d_str
+        entry["sessions"] += m.sessions or 0
+        entry["user_msgs"] += m.user_msgs or 0
+        entry["bot_msgs"] += m.bot_msgs or 0
+        entry["agent_msgs"] += m.agent_msgs or 0
+        entry["total_msgs"] += (m.user_msgs or 0) + (m.bot_msgs or 0) + (m.agent_msgs or 0)
+        entry["templates_sent"] += m.templates_sent or 0
+        entry["templates_delivered"] += m.templates_delivered or 0
+        entry["templates_replies"] += m.templates_replies or 0
+        entry["clients_count"] += 1
+
+    history = sorted(by_date.values(), key=lambda x: x["report_date"])
+    for idx, item in enumerate(history):
+        prev = history[idx - 1] if idx > 0 else None
+        item["mom_sessions_abs"] = (item["sessions"] - prev["sessions"]) if prev else 0
+        item["mom_sessions_pct"] = round(((item["mom_sessions_abs"] / prev["sessions"]) * 100.0), 1) if prev and prev["sessions"] > 0 else 0.0
+        tot_repl = item["templates_replies"]
+        tot_deliv = item["templates_delivered"]
+        item["reply_rate"] = round((tot_repl / tot_deliv * 100.0), 1) if tot_deliv > 0 else 0.0
+        tot_conv = item["bot_msgs"] + item["agent_msgs"]
+        item["auto_ratio"] = round((item["bot_msgs"] / tot_conv * 100.0), 1) if tot_conv > 0 else 0.0
+
+    return history
 
 def get_client_history(db: Session, client_id: str):
     client = db.query(Client).filter(Client.id == client_id).first()

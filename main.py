@@ -141,6 +141,16 @@ def get_client_history_endpoint(client_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/portfolio/history")
+@app.get("/portfolio/history")
+def get_portfolio_history_endpoint(db: Session = Depends(get_db)):
+    try:
+        ensure_tables()
+        return crud.get_portfolio_history(db)
+    except Exception as e:
+        print(f"Error fetching portfolio history: {e}")
+        return []
+
 @app.delete("/api/clients/{client_id}")
 @app.delete("/clients/{client_id}")
 def delete_client(client_id: str, db: Session = Depends(get_db)):
