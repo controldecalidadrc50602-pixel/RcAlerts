@@ -690,9 +690,23 @@
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
             <div>
               <h4 style="font-size: 13px; font-weight: 800; color: var(--text-main);">📈 Evolución Histórica Multimes (MoM)</h4>
-              <p style="font-size: 11px; color: var(--text-muted);">Comportamiento cronológico de Sesiones, Automatización Bot y Conversión de Plantillas</p>
+              <p style="font-size: 11px; color: var(--text-muted);">Comportamiento cronológico de Sesiones, Automatización Bot y Respuestas de Plantillas</p>
             </div>
-            <span id="modal-history-months-badge" style="font-size: 11px; font-weight: 700; background: #e0e7ff; color: #3730a3; padding: 3px 10px; border-radius: 12px;">Cargando historial...</span>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <!-- Selector de Métrica para la Serie de Respuestas -->
+              <div style="display: flex; background: #f1f5f9; padding: 2px; border-radius: 8px; border: 1px solid var(--border); gap: 2px;">
+                <button type="button" id="btn-chart-mode-replies-count" class="btn btn-sm" style="font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: 700; background: var(--primary); color: white; border: none; cursor: pointer;">
+                  📨 Cantidad Real
+                </button>
+                <button type="button" id="btn-chart-mode-replies-rate" class="btn btn-sm" style="font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: 600; background: transparent; color: #64748b; border: none; cursor: pointer;">
+                  % Tasa Respuesta
+                </button>
+                <button type="button" id="btn-chart-mode-both" class="btn btn-sm" style="font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: 600; background: transparent; color: #64748b; border: none; cursor: pointer;">
+                  ⚡ Ambas
+                </button>
+              </div>
+              <span id="modal-history-months-badge" style="font-size: 11px; font-weight: 700; background: #e0e7ff; color: #3730a3; padding: 3px 10px; border-radius: 12px;">Cargando historial...</span>
+            </div>
           </div>
 
           <!-- Gráfica de Líneas de Tendencia Multimes -->
@@ -1106,9 +1120,9 @@
                 <span style="font-weight: 700; font-family: monospace;">${Number(c.templates_sent || 0).toLocaleString()}</span>
               </div>
               <div>
-                <span style="color: var(--text-muted); font-size: 10px; display: block;">Resp. Plantilla</span>
+                <span style="color: var(--text-muted); font-size: 10px; display: block;">Resp. Plantilla (Cant. y %)</span>
                 <span style="font-weight: 700; font-family: monospace; color: ${Number(c.reply_rate || 0) < 4 ? 'var(--danger)' : 'inherit'};">
-                  ${Number(c.reply_rate || 0).toFixed(1)}%
+                  ${Number(c.templates_replies || 0).toLocaleString()} <span style="font-size: 10px; font-weight: 600;">(${Number(c.reply_rate || 0).toFixed(1)}%)</span>
                 </span>
               </div>
             </div>
@@ -2065,6 +2079,210 @@
     });
 
 
+    let currentClientHistory = [];
+    let currentHistoryChartMode = 'replies-count'; // 'replies-count' | 'replies-rate' | 'both'
+
+    function renderHistoryChart() {
+      if (!currentClientHistory || !currentClientHistory.length) return;
+      const canvas = document.getElementById('clientHistoryTrendChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (clientHistoryTrendChartInstance) clientHistoryTrendChartInstance.destroy();
+
+      // Actualizar estado visual de los botones de modo
+      const btnCount = document.getElementById('btn-chart-mode-replies-count');
+      const btnRate = document.getElementById('btn-chart-mode-replies-rate');
+      const btnBoth = document.getElementById('btn-chart-mode-both');
+      [btnCount, btnRate, btnBoth].forEach(b => {
+        if (b) {
+          b.style.background = 'transparent';
+          b.style.color = '#64748b';
+          b.style.fontWeight = '600';
+        }
+      });
+      const activeBtn = currentHistoryChartMode === 'replies-count' ? btnCount : (currentHistoryChartMode === 'replies-rate' ? btnRate : btnBoth);
+      if (activeBtn) {
+        activeBtn.style.background = 'var(--primary)';
+        activeBtn.style.color = '#fff';
+        activeBtn.style.fontWeight = '700';
+      }
+
+      const labels = currentClientHistory.map(h => h.report_date);
+      const sessionsData = currentClientHistory.map(h => Number(h.sessions || 0));
+      const autoData = currentClientHistory.map(h => Number(h.auto_ratio || 0));
+      const repliesCountData = currentClientHistory.map(h => Number(h.templates_replies || 0));
+      const repliesRateData = currentClientHistory.map(h => Number(h.reply_rate || 0));
+
+      const maxReplies = Math.max(...repliesCountData, 10);
+      const yRespMax = Math.ceil(maxReplies * 1.25);
+
+      const datasets = [
+        {
+          label: 'Sesiones Inbound',
+          data: sessionsData,
+          borderColor: '#4f46e5',
+          backgroundColor: 'rgba(79, 70, 229, 0.08)',
+          yAxisID: 'y',
+          tension: 0.25,
+          fill: true,
+          pointRadius: 5,
+          pointHoverRadius: 8,
+          order: 3
+        },
+        {
+          label: '% Automatización Bot',
+          data: autoData,
+          borderColor: '#a855f7',
+          borderDash: [5, 5],
+          yAxisID: 'yPct',
+          tension: 0.25,
+          fill: false,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          order: 2
+        }
+      ];
+
+      // Modo 1 o 3: Incluir CANTIDAD REAL DE RESPUESTAS (Unidades reales: 732, 58, 40)
+      if (currentHistoryChartMode === 'replies-count' || currentHistoryChartMode === 'both') {
+        datasets.unshift({
+          label: '📨 Cantidad Respuestas WhatsApp (Reales)',
+          data: repliesCountData,
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+          yAxisID: 'yResp',
+          tension: 0.2,
+          fill: currentHistoryChartMode === 'replies-count',
+          pointRadius: 7,
+          pointHoverRadius: 10,
+          pointBackgroundColor: '#10b981',
+          showDataLabels: true,
+          dataLabelFormatter: (val) => `${val.toLocaleString()} resp`,
+          order: 1
+        });
+      }
+
+      // Modo 2 o 3: Incluir TASA PORCENTUAL (%)
+      if (currentHistoryChartMode === 'replies-rate' || currentHistoryChartMode === 'both') {
+        datasets.push({
+          label: '🎯 % Tasa Respuesta Plantillas',
+          data: repliesRateData,
+          borderColor: '#06b6d4',
+          borderDash: currentHistoryChartMode === 'both' ? [4, 4] : [],
+          yAxisID: 'yPct',
+          tension: 0.2,
+          fill: false,
+          pointRadius: 6,
+          pointHoverRadius: 8,
+          pointStyle: 'rectRot',
+          pointBackgroundColor: '#06b6d4',
+          showDataLabels: currentHistoryChartMode === 'replies-rate',
+          dataLabelFormatter: (val) => `${val.toFixed(1)}%`,
+          order: 2
+        });
+      }
+
+      const scales = {
+        x: { grid: { display: false }, ticks: { font: { size: 11, weight: 'bold' } } },
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          title: { display: true, text: 'Sesiones Inbound', font: { size: 10, weight: 'bold' } },
+          grid: { color: '#f1f5f9' },
+          ticks: { font: { size: 10 } }
+        },
+        yPct: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          title: { display: true, text: 'Porcentaje (%)', font: { size: 10, weight: 'bold' } },
+          min: 0,
+          max: 100,
+          grid: { drawOnChartArea: false },
+          ticks: { callback: v => v + '%', font: { size: 10 } }
+        }
+      };
+
+      if (currentHistoryChartMode === 'replies-count' || currentHistoryChartMode === 'both') {
+        scales.yResp = {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          title: { display: true, text: 'Cantidad Respuestas Reales', font: { size: 10, weight: 'bold' } },
+          min: 0,
+          max: yRespMax,
+          grid: { drawOnChartArea: false },
+          ticks: {
+            font: { size: 10 },
+            callback: v => v.toLocaleString() + ' resp'
+          }
+        };
+      }
+
+      // Plugin para dibujar la cantidad real en negrita sobre cada punto
+      const dataLabelsPlugin = {
+        id: 'historyDataLabelsPlugin',
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          ctx.save();
+          ctx.font = 'bold 11px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+
+          chart.data.datasets.forEach((dataset, datasetIdx) => {
+            if (dataset.showDataLabels) {
+              const meta = chart.getDatasetMeta(datasetIdx);
+              meta.data.forEach((point, idx) => {
+                const val = dataset.data[idx];
+                if (val !== undefined && val !== null) {
+                  ctx.fillStyle = dataset.borderColor || '#10b981';
+                  const text = dataset.dataLabelFormatter ? dataset.dataLabelFormatter(val, idx) : String(val);
+                  ctx.fillText(text, point.x, point.y - 8);
+                }
+              });
+            }
+          });
+          ctx.restore();
+        }
+      };
+
+      clientHistoryTrendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: scales,
+          plugins: {
+            legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11, weight: '600' } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const val = ctx.parsed.y;
+                  const idx = ctx.dataIndex;
+                  const item = currentClientHistory[idx];
+                  if (ctx.dataset.yAxisID === 'yResp') {
+                    const rate = item ? Number(item.reply_rate || 0).toFixed(1) : '0';
+                    return ` 📨 Cantidad Respuestas: ${val.toLocaleString()} respuestas reales (${rate}% tasa)`;
+                  }
+                  if (ctx.dataset.yAxisID === 'yPct') {
+                    return ` ${ctx.dataset.label}: ${val.toFixed(1)}%`;
+                  }
+                  return ` ${ctx.dataset.label}: ${val.toLocaleString()} sesiones`;
+                }
+              }
+            }
+          }
+        },
+        plugins: [dataLabelsPlugin]
+      });
+    }
+
     async function loadClientHistoryTrend(clientId) {
       const badgeEl = document.getElementById('modal-history-months-badge');
       const tbody = document.getElementById('client-history-table-body');
@@ -2075,20 +2293,20 @@
         const res = await fetch(`/api/clients/${clientId}/history`);
         if (!res.ok) throw new Error("No se pudo cargar historial");
         const data = await res.json();
-        const history = data.history || [];
+        currentClientHistory = data.history || [];
 
         if (badgeEl) {
-          badgeEl.textContent = `${history.length} ${history.length === 1 ? 'mes registrado' : 'meses registrados'}`;
+          badgeEl.textContent = `${currentClientHistory.length} ${currentClientHistory.length === 1 ? 'mes registrado' : 'meses registrados'}`;
         }
 
-        if (!history.length) {
+        if (!currentClientHistory.length) {
           if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:12px; color:var(--text-muted);">Sin historial suficiente para comparar.</td></tr>';
           return;
         }
 
         // Llenar tabla cronológica
         if (tbody) {
-          tbody.innerHTML = history.map(h => {
+          tbody.innerHTML = currentClientHistory.map(h => {
             const deltaPct = Number(h.mom_sessions_pct || 0);
             const deltaAbs = Number(h.mom_sessions_abs || 0);
             const stBadge = h.status === 'red' ? '🔴 Riesgo' : (h.status === 'yellow' ? '🟡 Precaución' : '🟢 Saludable');
@@ -2103,7 +2321,7 @@
                 </td>
                 <td style="text-align: right; font-family: monospace;">${Number(h.auto_ratio || 0).toFixed(0)}%</td>
                 <td style="text-align: right; font-family: monospace;">${Number(h.templates_sent || 0).toLocaleString()}</td>
-                <td style="text-align: right; font-family: monospace;">${Number(h.templates_replies || 0).toLocaleString()}</td>
+                <td style="text-align: right; font-family: monospace; font-weight: 700; color: #10b981;">${Number(h.templates_replies || 0).toLocaleString()}</td>
                 <td style="text-align: right; font-family: monospace; font-weight: 700; color: ${Number(h.reply_rate || 0) < 6 ? 'var(--danger)' : 'var(--success)'};">
                   ${Number(h.reply_rate || 0).toFixed(1)}%
                 </td>
@@ -2113,96 +2331,8 @@
           }).join('');
         }
 
-        // Renderizar gráfico de líneas de tendencia MoM
-        const canvas = document.getElementById('clientHistoryTrendChart');
-        if (canvas) {
-          const ctx = canvas.getContext('2d');
-          if (clientHistoryTrendChartInstance) clientHistoryTrendChartInstance.destroy();
-
-          const labels = history.map(h => h.report_date);
-          const sessionsData = history.map(h => Number(h.sessions || 0));
-          const autoData = history.map(h => Number(h.auto_ratio || 0));
-          const replyData = history.map(h => Number(h.reply_rate || 0));
-
-          clientHistoryTrendChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-              labels: labels,
-              datasets: [
-                {
-                  label: 'Sesiones Inbound',
-                  data: sessionsData,
-                  borderColor: '#4f46e5',
-                  backgroundColor: 'rgba(79, 70, 229, 0.08)',
-                  yAxisID: 'y',
-                  tension: 0.25,
-                  fill: true,
-                  pointRadius: 6,
-                  pointHoverRadius: 8
-                },
-                {
-                  label: '% Automatización Bot',
-                  data: autoData,
-                  borderColor: '#a855f7',
-                  borderDash: [5, 5],
-                  yAxisID: 'y1',
-                  tension: 0.25,
-                  fill: false,
-                  pointRadius: 5
-                },
-                {
-                  label: '% Tasa Respuesta Plantillas',
-                  data: replyData,
-                  borderColor: '#10b981',
-                  backgroundColor: '#10b981',
-                  yAxisID: 'y1',
-                  tension: 0.25,
-                  fill: false,
-                  pointRadius: 6,
-                  pointStyle: 'rectRot'
-                }
-              ]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              interaction: { mode: 'index', intersect: false },
-              scales: {
-                x: { grid: { display: false }, ticks: { font: { size: 11, weight: 'bold' } } },
-                y: {
-                  type: 'linear',
-                  display: true,
-                  position: 'left',
-                  title: { display: true, text: 'Sesiones Totales', font: { size: 10 } },
-                  grid: { color: '#f1f5f9' },
-                  ticks: { font: { size: 10 } }
-                },
-                y1: {
-                  type: 'linear',
-                  display: true,
-                  position: 'right',
-                  title: { display: true, text: 'Porcentaje (%)', font: { size: 10 } },
-                  min: 0,
-                  max: 100,
-                  grid: { drawOnChartArea: false },
-                  ticks: { callback: v => v + '%', font: { size: 10 } }
-                }
-              },
-              plugins: {
-                legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } },
-                tooltip: {
-                  callbacks: {
-                    label: (ctx) => {
-                      const val = ctx.parsed.y;
-                      if (ctx.dataset.yAxisID === 'y1') return ` ${ctx.dataset.label}: ${val.toFixed(1)}%`;
-                      return ` ${ctx.dataset.label}: ${val.toLocaleString()} sesiones`;
-                    }
-                  }
-                }
-              }
-            }
-          });
-        }
+        // Renderizar gráfico con modo activo
+        renderHistoryChart();
 
       } catch (err) {
         console.warn("Error obteniendo historial:", err);
@@ -2388,6 +2518,19 @@
     document.getElementById('close-alerts-modal-btn')?.addEventListener('click', closeAlertsModal);
     document.getElementById('alerts-modal')?.addEventListener('click', (e) => {
       if (e.target.id === 'alerts-modal') closeAlertsModal();
+    });
+    // Selectores de Modo para la Gráfica de Historial (Cantidad Real vs % Tasa)
+    document.getElementById('btn-chart-mode-replies-count')?.addEventListener('click', () => {
+      currentHistoryChartMode = 'replies-count';
+      renderHistoryChart();
+    });
+    document.getElementById('btn-chart-mode-replies-rate')?.addEventListener('click', () => {
+      currentHistoryChartMode = 'replies-rate';
+      renderHistoryChart();
+    });
+    document.getElementById('btn-chart-mode-both')?.addEventListener('click', () => {
+      currentHistoryChartMode = 'both';
+      renderHistoryChart();
     });
 
     // Iniciar
