@@ -94,20 +94,52 @@ def health_db(db: Session = Depends(get_db)):
     except Exception as e:
         return {"status": "error", "db_connected": False, "error": str(e)}
 
+@app.get("/api/periods")
+@app.get("/periods")
+def get_periods_endpoint(db: Session = Depends(get_db)):
+    try:
+        ensure_tables()
+        return crud.get_available_periods(db)
+    except Exception as e:
+        return []
+
+@app.get("/api/alerts")
+@app.get("/alerts")
+def get_alerts_endpoint(db: Session = Depends(get_db)):
+    try:
+        ensure_tables()
+        return crud.compute_smart_alerts(db)
+    except Exception as e:
+        return []
+
 # Rutas API (Dual Decorator para compatibilidad local y Vercel rewrites)
 @app.get("/api/clients")
 @app.get("/clients")
-def get_clients(seed_demo: bool = False, db: Session = Depends(get_db)):
+def get_clients(period: Optional[str] = None, seed_demo: bool = False, db: Session = Depends(get_db)):
     try:
-        return crud.get_clients_with_latest_metric(db)
+        return crud.get_clients_with_latest_metric(db, period=period)
     except Exception as err:
         print(f"Retrying get_clients after ensuring tables: {err}")
         try:
             ensure_tables()
-            return crud.get_clients_with_latest_metric(db)
+            return crud.get_clients_with_latest_metric(db, period=period)
         except Exception as err2:
             print(f"Database error in get_clients: {err2}")
             return []
+
+@app.get("/api/clients/{client_id}/history")
+@app.get("/clients/{client_id}/history")
+def get_client_history_endpoint(client_id: str, db: Session = Depends(get_db)):
+    try:
+        ensure_tables()
+        history = crud.get_client_history(db, client_id)
+        if not history:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        return history
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/clients/{client_id}")
 @app.delete("/clients/{client_id}")

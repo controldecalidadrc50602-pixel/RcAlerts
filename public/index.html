@@ -236,6 +236,36 @@
 
     .hidden { display: none !important; }
 
+    @keyframes slideInLeft {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(0); }
+    }
+    .sidebar-client-item {
+      background: #f8fafc; border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 14px; cursor: pointer; transition: all 0.2s;
+    }
+    .sidebar-client-item:hover {
+      border-color: var(--primary); background: #f5f3ff; transform: translateY(-1px);
+    }
+    .period-pill {
+      font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 12px;
+      background: #e2e8f0; color: #334155; display: inline-block; margin-right: 4px; margin-top: 4px;
+      cursor: pointer; transition: all 0.15s; border: none;
+    }
+    .period-pill:hover, .period-pill.active {
+      background: var(--primary); color: #fff;
+    }
+    .alert-card-item {
+      border-radius: 10px; padding: 14px 16px; border: 1px solid transparent;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .alert-card-critical {
+      background: #fff1f2; border-color: #fecdd3; border-left: 5px solid #e11d48;
+    }
+    .alert-card-warning {
+      background: #fffbeb; border-color: #fde68a; border-left: 5px solid #f59e0b;
+    }
+
     @media print {
       header, .drop-box, .filter-bar, .no-print, .tab-navigation { display: none !important; }
       body { background: #fff; }
@@ -247,6 +277,9 @@
 
   <header>
     <div class="brand-box">
+      <button id="btn-toggle-sidebar" class="btn btn-default" style="font-weight: 700; border-radius: 8px; padding: 7px 12px; gap: 8px;" title="Abrir Historial por Cliente y Selector de Meses">
+        ☰ <span>Historial</span>
+      </button>
       <div class="brand-icon">⚡</div>
       <div>
         <div class="brand-title">OmniPulse Intelligence Hub</div>
@@ -257,12 +290,49 @@
       </div>
     </div>
     <div class="btn-group no-print">
+      <!-- SELECTOR GLOBAL DE PERÍODO -->
+      <div style="display: flex; align-items: center; gap: 6px; background: #f1f5f9; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border);">
+        <span style="font-size: 11px; font-weight: 700; color: var(--text-muted);">🗓️ Período:</span>
+        <select id="sel-global-period" style="font-size: 11px; font-weight: 700; border: none; background: transparent; color: #4338ca; cursor: pointer; outline: none;">
+          <option value="">🕒 Más Reciente (Consolidado)</option>
+        </select>
+      </div>
+
+      <!-- BOTÓN CENTRO DE ALERTAS -->
+      <button id="btn-open-alerts" class="btn btn-default" style="position: relative; font-weight: 700;" title="Ver Alertas Tácticas y Detección de Anomalías">
+        🔔 Alertas <span id="badge-alerts-count" style="background: #e11d48; color: white; border-radius: 10px; padding: 1px 6px; font-size: 10px; font-weight: 800; margin-left: 2px;">0</span>
+      </button>
+
       <button id="btn-clear-db" class="btn btn-danger-outline" title="Vaciar base de datos para comenzar en blanco">🗑️ Limpiar Cartera</button>
       <button id="btn-load-demo" class="btn btn-default">✨ Cargar 5 Clientes Demo</button>
       <button id="btn-export-md" class="btn btn-primary">📄 Exportar NotebookLM (.MD)</button>
       <button id="btn-print" class="btn btn-default">🖨️ Imprimir / PDF</button>
     </div>
   </header>
+
+  <!-- SIDEBAR LATERAL DE HISTORIAL POR CLIENTE -->
+  <div id="sidebar-overlay" class="modal-overlay hidden" style="z-index: 998; background: rgba(15, 23, 42, 0.4);" aria-hidden="true"></div>
+  <aside id="sidebar-drawer" class="hidden" style="position: fixed; top: 0; left: 0; bottom: 0; width: 380px; max-width: 90vw; background: #fff; z-index: 999; box-shadow: 4px 0 24px rgba(0,0,0,0.15); display: flex; flex-direction: column; animation: slideInLeft 0.25s ease-out;">
+    <div style="padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+      <div>
+        <h3 style="font-size: 15px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+          📊 Historial por Cliente
+        </h3>
+        <p style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Navega por meses y analiza evolución</p>
+      </div>
+      <button id="btn-close-sidebar" class="close-btn" style="position: static; font-size: 16px;">✕</button>
+    </div>
+
+    <!-- Buscador en Sidebar -->
+    <div style="padding: 12px 20px; border-bottom: 1px solid var(--border); background: #fff;">
+      <input type="text" id="sidebar-search-input" placeholder="🔍 Buscar cliente en historial..." style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; outline: none;">
+    </div>
+
+    <!-- Lista de Clientes con sus meses -->
+    <div id="sidebar-clients-list" style="flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+      <!-- Generado dinámicamente con JS -->
+    </div>
+  </aside>
 
   <main>
     <!-- Navegación de Pestañas Analíticas -->
@@ -615,8 +685,62 @@
           <div id="modal-diagnostic-text" style="font-size: 12px; color: #1e1b4b; margin-top: 6px; line-height: 1.5;"></div>
         </div>
 
+        <!-- EVOLUCIÓN HISTÓRICA MULTIMES (MoM) -->
+        <div style="background: #ffffff; border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-top: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <h4 style="font-size: 13px; font-weight: 800; color: var(--text-main);">📈 Evolución Histórica Multimes (MoM)</h4>
+              <p style="font-size: 11px; color: var(--text-muted);">Comportamiento cronológico de Sesiones, Automatización Bot y Conversión de Plantillas</p>
+            </div>
+            <span id="modal-history-months-badge" style="font-size: 11px; font-weight: 700; background: #e0e7ff; color: #3730a3; padding: 3px 10px; border-radius: 12px;">Cargando historial...</span>
+          </div>
+
+          <!-- Gráfica de Líneas de Tendencia Multimes -->
+          <div style="height: 220px; position: relative; margin-bottom: 16px;">
+            <canvas id="clientHistoryTrendChart"></canvas>
+          </div>
+
+          <!-- Tabla Comparativa MoM -->
+          <div style="overflow-x: auto;">
+            <table class="data-table" style="font-size: 11px; width: 100%;">
+              <thead>
+                <tr>
+                  <th>Período</th>
+                  <th style="text-align: right;">Sesiones</th>
+                  <th style="text-align: right;">Var. MoM</th>
+                  <th style="text-align: right;">% Bot</th>
+                  <th style="text-align: right;">Plantillas Env.</th>
+                  <th style="text-align: right;">Respuestas</th>
+                  <th style="text-align: right;">Tasa Respuesta</th>
+                  <th style="text-align: center;">Estado</th>
+                </tr>
+              </thead>
+              <tbody id="client-history-table-body">
+                <!-- Se puebla dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
           <button id="btn-delete-modal-client" class="btn btn-danger-outline">🗑️ Eliminar este Cliente de la Cartera</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 3: CENTRO DE ALERTAS TÁCTICAS Y ANOMALÍAS MOM -->
+    <div id="alerts-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+      <div class="modal-content" style="max-width: 680px;">
+        <button class="close-btn" id="close-alerts-modal-btn" aria-label="Cerrar">✕</button>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+          <div style="width: 38px; height: 38px; border-radius: 10px; background: #ffe4e6; color: #e11d48; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold;">🚨</div>
+          <div>
+            <h2 style="font-size: 17px; font-weight: 800; color: var(--text-main);">Centro de Alertas & Detección de Anomalías</h2>
+            <p style="font-size: 12px; color: var(--text-muted);">Monitoreo automático de variaciones críticas mes a mes (MoM)</p>
+          </div>
+        </div>
+        <div id="alerts-list-container" style="max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 0;">
+          <!-- Generado dinámicamente -->
         </div>
       </div>
     </div>
@@ -647,11 +771,15 @@
     }
 
     let clientsData = [];
+    let availablePeriods = [];
+    let currentPeriod = '';
+    let currentAlerts = [];
     let globalChartInstance = null;
     let scatterQuadrantInstance = null;
     let funnelCorrelationInstance = null;
     let modalDoughnutInstance = null;
     let modalBarInstance = null;
+    let clientHistoryTrendChartInstance = null;
     let currentFilter = 'all';
     let searchQuery = '';
     let selectedClientForModal = null;
@@ -673,9 +801,33 @@
       };
     });
 
-    async function fetchClients() {
+    async function fetchPeriods() {
       try {
-        const res = await fetch('/api/clients');
+        const res = await fetch('/api/periods');
+        if (res.ok) {
+          availablePeriods = await res.json();
+          const sel = document.getElementById('sel-global-period');
+          if (sel) {
+            sel.innerHTML = '<option value="">🕒 Más Reciente (Consolidado)</option>';
+            availablePeriods.forEach(p => {
+              const opt = document.createElement('option');
+              opt.value = p;
+              opt.textContent = `📅 ${p}`;
+              if (p === currentPeriod) opt.selected = true;
+              sel.appendChild(opt);
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Error cargando períodos:", err);
+      }
+    }
+
+    async function fetchClients(period = null) {
+      if (period !== null) currentPeriod = period;
+      try {
+        const url = currentPeriod ? `/api/clients?period=${encodeURIComponent(currentPeriod)}` : '/api/clients';
+        const res = await fetch(url);
         if (res.ok) {
           clientsData = await res.json();
           renderAll();
@@ -685,10 +837,161 @@
       }
     }
 
+    async function fetchAlerts() {
+      try {
+        const res = await fetch('/api/alerts');
+        if (res.ok) {
+          currentAlerts = await res.json();
+          const badge = document.getElementById('badge-alerts-count');
+          if (badge) {
+            badge.textContent = currentAlerts.length;
+            badge.style.display = currentAlerts.length > 0 ? 'inline-block' : 'none';
+          }
+          renderAlertsList();
+        }
+      } catch (err) {
+        console.warn("Error cargando alertas:", err);
+      }
+    }
+
+    function renderAlertsList() {
+      const container = document.getElementById('alerts-list-container');
+      if (!container) return;
+      if (!currentAlerts || !currentAlerts.length) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 32px 16px; color: var(--text-muted);">
+            <div style="font-size: 28px; margin-bottom: 8px;">✅</div>
+            <p style="font-size: 13px; font-weight: 700;">No hay anomalías críticas detectadas</p>
+            <p style="font-size: 11px;">Todas las cuentas operan dentro de los rangos esperados de sesiones y conversión.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = currentAlerts.map(a => `
+        <div class="alert-card-item ${a.level === 'critical' ? 'alert-card-critical' : 'alert-card-warning'}">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+            <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: ${a.level === 'critical' ? '#e11d48' : '#d97706'};">
+              ${a.level === 'critical' ? '🚨 Anomalía Crítica' : '⚠️ Atención Operativa'} • ${escapeHtml(a.period)}
+            </span>
+            <span style="font-size: 10px; font-weight: 700; background: #fff; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--border);">
+              ${escapeHtml(a.client_name)}
+            </span>
+          </div>
+          <h4 style="font-size: 13px; font-weight: 800; color: #0f172a; margin-top: 2px;">
+            ${escapeHtml(a.title)}
+          </h4>
+          <p style="font-size: 12px; color: #334155; line-height: 1.4;">
+            ${escapeHtml(a.detail)}
+          </p>
+          <div style="background: rgba(255,255,255,0.7); border-radius: 6px; padding: 8px 10px; margin-top: 4px; font-size: 11px; color: #1e293b;">
+            <strong>💡 Acción recomendada:</strong> ${escapeHtml(a.action)}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderSidebar() {
+      const list = document.getElementById('sidebar-clients-list');
+      if (!list) return;
+      list.innerHTML = '';
+
+      const query = (document.getElementById('sidebar-search-input')?.value || '').toLowerCase().trim();
+      const filtered = (clientsData || []).filter(c => {
+        if (!c) return false;
+        const name = (c.name || '').toLowerCase();
+        const id = (c.id || '').toLowerCase();
+        return !query || name.includes(query) || id.includes(query);
+      });
+
+      if (!filtered.length) {
+        list.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 20px 0;">No se encontraron clientes</div>`;
+        return;
+      }
+
+      filtered.forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'sidebar-client-item';
+        
+        const statusColor = c.status === 'red' ? '#e11d48' : (c.status === 'yellow' ? '#f59e0b' : '#10b981');
+        const statusText = c.status === 'red' ? 'Riesgo Churn' : (c.status === 'yellow' ? 'Precaución' : 'Saludable');
+        
+        item.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 13px; font-weight: 800; color: var(--text-main);">${escapeHtml(c.name)}</span>
+            <span style="font-size: 10px; font-weight: 700; color: ${statusColor}; background: #fff; padding: 2px 6px; border-radius: 8px; border: 1px solid var(--border);">
+              ${statusText}
+            </span>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span>Sesiones: <strong>${Number(c.sessions || 0).toLocaleString()}</strong></span>
+            <span>Bot: <strong>${Number(c.auto_ratio || 0).toFixed(0)}%</strong></span>
+            <span>Resp: <strong>${Number(c.reply_rate || 0).toFixed(1)}%</strong></span>
+          </div>
+          <div style="border-top: 1px dashed var(--border); padding-top: 6px;">
+            <span style="font-size: 10px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 2px;">Meses disponibles:</span>
+            <div id="pills-${c.id}" style="display: flex; flex-wrap: wrap; gap: 4px;">
+              ${(availablePeriods.length ? availablePeriods : [c.report_date || 'Reciente']).map(p => `
+                <button class="period-pill ${currentPeriod === p ? 'active' : ''}" data-client-id="${c.id}" data-period="${p}" onclick="event.stopPropagation(); selectPeriodPill('${p}')">
+                  📅 ${p}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+          <div style="margin-top: 8px; text-align: right;">
+            <button class="btn btn-sm" style="font-size: 10px; padding: 3px 8px; background: #e0e7ff; color: #4338ca; border: none; border-radius: 6px; font-weight: 700;" onclick="event.stopPropagation(); openClientHistoryModal('${c.id}')">
+              📈 Ver Historial Completo →
+            </button>
+          </div>
+        `;
+
+        item.onclick = () => openClientModal(c);
+        list.appendChild(item);
+      });
+    }
+
+    async function selectPeriodPill(period) {
+      currentPeriod = period;
+      const sel = document.getElementById('sel-global-period');
+      if (sel) sel.value = period;
+      await fetchClients(period);
+      closeSidebar();
+      showToast(`🗓️ Período seleccionado: ${period}`);
+    }
+
+    function openClientHistoryModal(clientId) {
+      const client = clientsData.find(c => c.id === clientId);
+      if (client) {
+        closeSidebar();
+        openClientModal(client);
+      }
+    }
+
+    function openSidebar() {
+      document.getElementById('sidebar-drawer')?.classList.remove('hidden');
+      document.getElementById('sidebar-overlay')?.classList.remove('hidden');
+      renderSidebar();
+    }
+
+    function closeSidebar() {
+      document.getElementById('sidebar-drawer')?.classList.add('hidden');
+      document.getElementById('sidebar-overlay')?.classList.add('hidden');
+    }
+
+    function openAlertsModal() {
+      document.getElementById('alerts-modal')?.classList.remove('hidden');
+      fetchAlerts();
+    }
+
+    function closeAlertsModal() {
+      document.getElementById('alerts-modal')?.classList.add('hidden');
+    }
+
     function renderAll() {
       renderDashboard();
       renderMatrix();
       updateCharts();
+      renderSidebar();
     }
 
     function getFilteredClients() {
@@ -1762,6 +2065,152 @@
     });
 
 
+    async function loadClientHistoryTrend(clientId) {
+      const badgeEl = document.getElementById('modal-history-months-badge');
+      const tbody = document.getElementById('client-history-table-body');
+      if (badgeEl) badgeEl.textContent = 'Cargando historial...';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:12px;">Cargando evolución temporal...</td></tr>';
+
+      try {
+        const res = await fetch(`/api/clients/${clientId}/history`);
+        if (!res.ok) throw new Error("No se pudo cargar historial");
+        const data = await res.json();
+        const history = data.history || [];
+
+        if (badgeEl) {
+          badgeEl.textContent = `${history.length} ${history.length === 1 ? 'mes registrado' : 'meses registrados'}`;
+        }
+
+        if (!history.length) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:12px; color:var(--text-muted);">Sin historial suficiente para comparar.</td></tr>';
+          return;
+        }
+
+        // Llenar tabla cronológica
+        if (tbody) {
+          tbody.innerHTML = history.map(h => {
+            const deltaPct = Number(h.mom_sessions_pct || 0);
+            const deltaAbs = Number(h.mom_sessions_abs || 0);
+            const stBadge = h.status === 'red' ? '🔴 Riesgo' : (h.status === 'yellow' ? '🟡 Precaución' : '🟢 Saludable');
+            const stClass = h.status === 'red' ? 'badge-red' : (h.status === 'yellow' ? 'badge-yellow' : 'badge-green');
+            const isSelectedPeriod = currentPeriod && h.report_date === currentPeriod;
+            return `
+              <tr style="${isSelectedPeriod ? 'background: #f5f3ff; font-weight: bold;' : ''}">
+                <td><strong>📅 ${escapeHtml(h.report_date)}</strong> ${isSelectedPeriod ? '<span style="color:var(--primary); font-size:9px;">(Activo)</span>' : ''}</td>
+                <td style="text-align: right; font-family: monospace;">${Number(h.sessions || 0).toLocaleString()}</td>
+                <td style="text-align: right; font-family: monospace; color: ${deltaPct >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                  ${deltaPct >= 0 ? '+' : ''}${deltaPct}% (${deltaAbs >= 0 ? '+' : ''}${deltaAbs.toLocaleString()})
+                </td>
+                <td style="text-align: right; font-family: monospace;">${Number(h.auto_ratio || 0).toFixed(0)}%</td>
+                <td style="text-align: right; font-family: monospace;">${Number(h.templates_sent || 0).toLocaleString()}</td>
+                <td style="text-align: right; font-family: monospace;">${Number(h.templates_replies || 0).toLocaleString()}</td>
+                <td style="text-align: right; font-family: monospace; font-weight: 700; color: ${Number(h.reply_rate || 0) < 6 ? 'var(--danger)' : 'var(--success)'};">
+                  ${Number(h.reply_rate || 0).toFixed(1)}%
+                </td>
+                <td style="text-align: center;"><span class="badge ${stClass}" style="font-size: 10px; padding: 1px 6px;">${stBadge}</span></td>
+              </tr>
+            `;
+          }).join('');
+        }
+
+        // Renderizar gráfico de líneas de tendencia MoM
+        const canvas = document.getElementById('clientHistoryTrendChart');
+        if (canvas) {
+          const ctx = canvas.getContext('2d');
+          if (clientHistoryTrendChartInstance) clientHistoryTrendChartInstance.destroy();
+
+          const labels = history.map(h => h.report_date);
+          const sessionsData = history.map(h => Number(h.sessions || 0));
+          const autoData = history.map(h => Number(h.auto_ratio || 0));
+          const replyData = history.map(h => Number(h.reply_rate || 0));
+
+          clientHistoryTrendChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: 'Sesiones Inbound',
+                  data: sessionsData,
+                  borderColor: '#4f46e5',
+                  backgroundColor: 'rgba(79, 70, 229, 0.08)',
+                  yAxisID: 'y',
+                  tension: 0.25,
+                  fill: true,
+                  pointRadius: 6,
+                  pointHoverRadius: 8
+                },
+                {
+                  label: '% Automatización Bot',
+                  data: autoData,
+                  borderColor: '#a855f7',
+                  borderDash: [5, 5],
+                  yAxisID: 'y1',
+                  tension: 0.25,
+                  fill: false,
+                  pointRadius: 5
+                },
+                {
+                  label: '% Tasa Respuesta Plantillas',
+                  data: replyData,
+                  borderColor: '#10b981',
+                  backgroundColor: '#10b981',
+                  yAxisID: 'y1',
+                  tension: 0.25,
+                  fill: false,
+                  pointRadius: 6,
+                  pointStyle: 'rectRot'
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              interaction: { mode: 'index', intersect: false },
+              scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 11, weight: 'bold' } } },
+                y: {
+                  type: 'linear',
+                  display: true,
+                  position: 'left',
+                  title: { display: true, text: 'Sesiones Totales', font: { size: 10 } },
+                  grid: { color: '#f1f5f9' },
+                  ticks: { font: { size: 10 } }
+                },
+                y1: {
+                  type: 'linear',
+                  display: true,
+                  position: 'right',
+                  title: { display: true, text: 'Porcentaje (%)', font: { size: 10 } },
+                  min: 0,
+                  max: 100,
+                  grid: { drawOnChartArea: false },
+                  ticks: { callback: v => v + '%', font: { size: 10 } }
+                }
+              },
+              plugins: {
+                legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => {
+                      const val = ctx.parsed.y;
+                      if (ctx.dataset.yAxisID === 'y1') return ` ${ctx.dataset.label}: ${val.toFixed(1)}%`;
+                      return ` ${ctx.dataset.label}: ${val.toLocaleString()} sesiones`;
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+
+      } catch (err) {
+        console.warn("Error obteniendo historial:", err);
+        if (badgeEl) badgeEl.textContent = 'Mes único';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:12px; color:var(--text-muted);">Solo hay 1 período registrado para este cliente. Al subir más meses se formará la curva comparativa.</td></tr>';
+      }
+    }
+
     // MODAL DETALLE
     function openClientModal(client) {
       if (!client) return;
@@ -1827,6 +2276,9 @@
         });
       }
 
+      // Cargar evolución histórica y gráfico MoM
+      loadClientHistoryTrend(client.id);
+
       document.getElementById('client-modal')?.classList.remove('hidden');
     }
 
@@ -1887,7 +2339,9 @@
         const res = await fetch('/api/seed-demo', { method: 'POST' });
         if (res.ok) {
           showToast('✨ 5 Clientes demo cargados en la BD');
+          await fetchPeriods();
           await fetchClients();
+          await fetchAlerts();
         }
       } catch (e) {
         console.error(e);
@@ -1918,8 +2372,30 @@
 
     document.getElementById('btn-print').onclick = () => window.print();
 
+    // Event listeners para Sidebar y Alertas
+    document.getElementById('btn-toggle-sidebar')?.addEventListener('click', openSidebar);
+    document.getElementById('btn-close-sidebar')?.addEventListener('click', closeSidebar);
+    document.getElementById('sidebar-overlay')?.addEventListener('click', closeSidebar);
+    document.getElementById('sidebar-search-input')?.addEventListener('input', renderSidebar);
+
+    document.getElementById('sel-global-period')?.addEventListener('change', async (e) => {
+      currentPeriod = e.target.value;
+      await fetchClients(currentPeriod);
+      showToast(currentPeriod ? `🗓️ Período filtrado: ${currentPeriod}` : '🕒 Mostrando período consolidado');
+    });
+
+    document.getElementById('btn-open-alerts')?.addEventListener('click', openAlertsModal);
+    document.getElementById('close-alerts-modal-btn')?.addEventListener('click', closeAlertsModal);
+    document.getElementById('alerts-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'alerts-modal') closeAlertsModal();
+    });
+
     // Iniciar
-    document.addEventListener('DOMContentLoaded', fetchClients);
+    document.addEventListener('DOMContentLoaded', async () => {
+      await fetchPeriods();
+      await fetchClients();
+      await fetchAlerts();
+    });
   </script>
 </body>
 </html>

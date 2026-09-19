@@ -205,7 +205,11 @@ def clear_all_data(db: Session):
     db.commit()
     return True
 
-def get_clients_with_latest_metric(db: Session):
+def get_available_periods(db: Session):
+    dates = db.query(WeeklyMetric.report_date).distinct().order_by(WeeklyMetric.report_date.desc()).all()
+    return [str(d[0]) for d in dates if d[0]]
+
+def get_clients_with_latest_metric(db: Session, period: str = None):
     clients = db.query(Client).all()
     if not clients:
         return []
@@ -216,11 +220,20 @@ def get_clients_with_latest_metric(db: Session):
 
     temp_list = []
     for c in clients:
-        latest = c.metrics[0] if c.metrics else None
-        sessions = latest.sessions if latest else 0
-        user_msgs = latest.user_msgs if latest else 0
-        bot_msgs = latest.bot_msgs if latest else 0
-        agent_msgs = latest.agent_msgs if latest else 0
+        # Si se especifica período (ej. '2026-04-30' o '2026-04'), buscar la métrica correspondiente
+        target_metric = None
+        if period:
+            for m in c.metrics:
+                if str(m.report_date) == period or str(m.report_date).startswith(period):
+                    target_metric = m
+                    break
+        if not target_metric:
+            target_metric = c.metrics[0] if c.metrics else None
+
+        sessions = target_metric.sessions if target_metric else 0
+        user_msgs = target_metric.user_msgs if target_metric else 0
+        bot_msgs = target_metric.bot_msgs if target_metric else 0
+        agent_msgs = target_metric.agent_msgs if target_metric else 0
         total_msgs = user_msgs + bot_msgs + agent_msgs
 
         portfolio_total_sessions += sessions
@@ -228,7 +241,7 @@ def get_clients_with_latest_metric(db: Session):
 
         temp_list.append({
             "client": c,
-            "latest": latest,
+            "metric": target_metric,
             "sessions": sessions,
             "user_msgs": user_msgs,
             "bot_msgs": bot_msgs,
@@ -239,31 +252,31 @@ def get_clients_with_latest_metric(db: Session):
     results = []
     for item in temp_list:
         c = item["client"]
-        latest = item["latest"]
+        m = item["metric"]
         sessions = item["sessions"]
-        prev_sessions = latest.prev_sessions if latest else sessions
+        prev_sessions = m.prev_sessions if m else sessions
         user_msgs = item["user_msgs"]
         bot_msgs = item["bot_msgs"]
         agent_msgs = item["agent_msgs"]
         total_msgs = item["total_msgs"]
-        templates_sent = latest.templates_sent if latest else 0
-        templates_delivered = latest.templates_delivered if latest else 0
-        templates_replies = latest.templates_replies if latest else 0
+        templates_sent = m.templates_sent if m else 0
+        templates_delivered = m.templates_delivered if m else 0
+        templates_replies = m.templates_replies if m else 0
 
-        # Variaciones Horizontales (WoW)
+        # Variaciones Horizontales (WoW / MoM)
         delta_sessions_abs = sessions - prev_sessions
         delta_sessions_pct = ((sessions - prev_sessions) / prev_sessions * 100.0) if prev_sessions > 0 else 0.0
 
-        # Análisis Vertical Interno (% de cada canal en la cuenta)
+        # Análisis Vertical Interno
         share_bot = (bot_msgs / total_msgs * 100.0) if total_msgs > 0 else 0.0
         share_agent = (agent_msgs / total_msgs * 100.0) if total_msgs > 0 else 0.0
         share_user = (user_msgs / total_msgs * 100.0) if total_msgs > 0 else 0.0
 
-        # Análisis Vertical de Cartera (% de participación del cliente en la cartera global)
+        # Análisis Vertical de Cartera
         portfolio_share_sessions = (sessions / portfolio_total_sessions * 100.0) if portfolio_total_sessions > 0 else 0.0
         portfolio_share_msgs = (total_msgs / portfolio_total_msgs * 100.0) if portfolio_total_msgs > 0 else 0.0
 
-        issues = json.loads(latest.issues) if latest and latest.issues else ["Sin métricas"]
+        issues = json.loads(m.issues) if m and m.issues else ["Sin métricas"]
 
         results.append({
             "id": c.id,
@@ -284,30 +297,155 @@ def get_clients_with_latest_metric(db: Session):
             "templates_replies": templates_replies,
 
             # Ratios de Eficiencia
-            "auto_ratio": latest.auto_ratio if latest else 0.0,
-            "delivery_rate": latest.delivery_rate if latest else 0.0,
-            "reply_rate": latest.reply_rate if latest else 0.0,
-            "churn_score": latest.churn_score if latest else 100.0,
-            "status": latest.status if latest else "green",
+            "auto_ratio": m.auto_ratio if m else 0.0,
+            "delivery_rate": m.delivery_rate if m else 0.0,
+            "reply_rate": m.reply_rate if m else 0.0,
+            "churn_score": m.churn_score if m else 100.0,
+            "status": m.status if m else "green",
             "issues": issues,
 
-            # Análisis Horizontal (Evolución Temporal)
+            # Deltas Calculadas
             "delta_sessions_abs": delta_sessions_abs,
             "delta_sessions_pct": round(delta_sessions_pct, 1),
-            
-            # Análisis Vertical Interno (Estructura de la Cuenta)
+
+            # Mix Canales
             "share_bot": round(share_bot, 1),
             "share_agent": round(share_agent, 1),
             "share_user": round(share_user, 1),
 
-            # Análisis Vertical de Cartera (Peso relativo del cliente)
+            # Análisis Vertical de Cartera
             "portfolio_share_sessions": round(portfolio_share_sessions, 1),
             "portfolio_share_msgs": round(portfolio_share_msgs, 1),
 
-            "report_date": str(latest.report_date) if latest else str(date.today())
+            "report_date": str(m.report_date) if m else str(date.today()),
+            "available_dates": [str(x.report_date) for x in c.metrics]
         })
 
     return results
+
+def get_client_history(db: Session, client_id: str):
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        return None
+
+    # Métricas ordenadas cronológicamente de más antigua a más reciente
+    metrics_sorted = sorted(client.metrics, key=lambda m: m.report_date)
+    history = []
+    for idx, m in enumerate(metrics_sorted):
+        total_msgs = m.user_msgs + m.bot_msgs + m.agent_msgs
+        prev_m = metrics_sorted[idx - 1] if idx > 0 else None
+        
+        # Variación MoM de sesiones
+        mom_sessions_abs = (m.sessions - prev_m.sessions) if prev_m else (m.sessions - m.prev_sessions)
+        mom_sessions_pct = ((mom_sessions_abs / prev_m.sessions) * 100.0) if prev_m and prev_m.sessions > 0 else 0.0
+
+        # Variación MoM de respuesta de plantillas
+        mom_reply_pct = (m.reply_rate - prev_m.reply_rate) if prev_m else 0.0
+
+        history.append({
+            "report_date": str(m.report_date),
+            "sessions": m.sessions,
+            "prev_sessions": m.prev_sessions,
+            "mom_sessions_abs": mom_sessions_abs,
+            "mom_sessions_pct": round(mom_sessions_pct, 1),
+            "user_msgs": m.user_msgs,
+            "bot_msgs": m.bot_msgs,
+            "agent_msgs": m.agent_msgs,
+            "total_msgs": total_msgs,
+            "auto_ratio": m.auto_ratio,
+            "templates_sent": m.templates_sent,
+            "templates_delivered": m.templates_delivered,
+            "templates_replies": m.templates_replies,
+            "delivery_rate": m.delivery_rate,
+            "reply_rate": m.reply_rate,
+            "mom_reply_pct": round(mom_reply_pct, 1),
+            "status": m.status,
+            "churn_score": m.churn_score,
+            "issues": json.loads(m.issues) if m.issues else []
+        })
+
+    return {
+        "client": {
+            "id": client.id,
+            "name": client.name,
+            "website": client.website,
+            "industry": client.industry,
+            "focus": client.focus
+        },
+        "history": history
+    }
+
+def compute_smart_alerts(db: Session):
+    clients = db.query(Client).all()
+    alerts = []
+
+    for c in clients:
+        metrics = sorted(c.metrics, key=lambda m: m.report_date, reverse=True)
+        if not metrics:
+            continue
+
+        latest = metrics[0]
+        prev = metrics[1] if len(metrics) > 1 else None
+
+        # Alerta 1: Desplome crítico en conversión de plantillas MoM
+        if prev and prev.reply_rate > 10.0 and latest.reply_rate < 6.0:
+            drop_relative = ((latest.reply_rate - prev.reply_rate) / prev.reply_rate) * 100.0
+            alerts.append({
+                "id": f"alert-hsm-drop-{c.id}-{latest.report_date}",
+                "level": "critical",
+                "client_id": c.id,
+                "client_name": c.name,
+                "period": str(latest.report_date),
+                "title": f"Desplome Crítico en Respuestas de Plantillas WhatsApp ({drop_relative:.1f}%)",
+                "detail": f"La tasa de respuesta cayó de {prev.reply_rate:.1f}% ({prev.templates_replies} respuestas) a {latest.reply_rate:.1f}% ({latest.templates_replies} respuestas) este mes.",
+                "action": "Auditar copy de plantilla reciente, verificar si cambió el público objetivo o segmentar base para evitar fatiga de números."
+            })
+        elif latest.reply_rate < 5.0 and latest.templates_sent > 100:
+            alerts.append({
+                "id": f"alert-hsm-low-{c.id}-{latest.report_date}",
+                "level": "warning",
+                "client_id": c.id,
+                "client_name": c.name,
+                "period": str(latest.report_date),
+                "title": f"Efectividad de Plantillas por debajo de Benchmark ({latest.reply_rate:.1f}%)",
+                "detail": f"Solo {latest.templates_replies} respuestas de {latest.templates_delivered} entregadas (esperado >10%).",
+                "action": "Incorporar llamadas a la acción (CTA) con botones interactivos de respuesta rápida."
+            })
+
+        # Alerta 2: Caída de sesiones MoM
+        if prev and latest.sessions < prev.sessions:
+            sess_drop = ((latest.sessions - prev.sessions) / prev.sessions) * 100.0
+            if sess_drop <= -15.0:
+                alerts.append({
+                    "id": f"alert-sess-drop-{c.id}-{latest.report_date}",
+                    "level": "critical",
+                    "client_id": c.id,
+                    "client_name": c.name,
+                    "period": str(latest.report_date),
+                    "title": f"Caída Alarmante de Tráfico Inbound ({sess_drop:.1f}%)",
+                    "detail": f"Las sesiones cayeron de {prev.sessions:,} a {latest.sessions:,} ({sess_drop:.1f}%). Riesgo de churn contractual.",
+                    "action": "Contactar al cliente para revisar si se apagaron campañas de marketing o hubo cambios en el sitio web."
+                })
+
+        # Alerta 3: Sobrecarga en agentes humanos
+        if latest.share_agent if hasattr(latest, 'share_agent') else False:
+            pass
+        total_conv = latest.bot_msgs + latest.agent_msgs
+        if total_conv > 100:
+            human_share = (latest.agent_msgs / total_conv) * 100.0
+            if human_share > 65.0:
+                alerts.append({
+                    "id": f"alert-human-overload-{c.id}-{latest.report_date}",
+                    "level": "warning",
+                    "client_id": c.id,
+                    "client_name": c.name,
+                    "period": str(latest.report_date),
+                    "title": f"Sobrecarga de Agentes Humanos ({human_share:.0f}%)",
+                    "detail": f"Los agentes humanos están absorbiendo el {human_share:.0f}% del diálogo. El bot solo resuelve el {latest.auto_ratio:.0f}%.",
+                    "action": "Revisar motivos de derivación y entrenar intenciones frecuentes en Botmaker para aumentar contención."
+                })
+
+    return alerts
 
 def seed_demo_data(db: Session):
     demo_clients = [
