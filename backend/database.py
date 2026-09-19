@@ -2,6 +2,7 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
+import re
 import urllib.parse
 
 def sanitize_db_url(url: str) -> str:
@@ -9,6 +10,15 @@ def sanitize_db_url(url: str) -> str:
         return url
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
+        
+    # Auto-conmutación de conexión directa IPv6 a Pooler IPv4 resiliente en Vercel
+    match = re.search(r'@db\.([a-z0-9]+)\.supabase\.co(?::5432)?', url)
+    if match:
+        project_ref = match.group(1)
+        url = url.replace(match.group(0), '@aws-0-us-east-2.pooler.supabase.com:5432')
+        if f"postgres.{project_ref}" not in url and "://postgres:" in url:
+            url = url.replace("://postgres:", f"://postgres.{project_ref}:", 1)
+            
     try:
         prefix, _, rest = url.partition("://")
         auth, at, host_part = rest.rpartition("@")
@@ -19,6 +29,7 @@ def sanitize_db_url(url: str) -> str:
     except Exception:
         pass
     return url
+
 
 # Detección de entorno serverless (Vercel / AWS Lambda)
 is_serverless = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
