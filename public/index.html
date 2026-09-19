@@ -1441,20 +1441,32 @@
       }
     }
 
-    // MAPEO INTELIGENTE DE COLUMNAS
+    // MAPEO INTELIGENTE DE COLUMNAS CON NORMALIZACIÓN DE ACENTOS Y GUIONES
     function normalizeField(row, candidates) {
       if (!row || typeof row !== 'object') return undefined;
       const keys = Object.keys(row);
       for (const cand of candidates) {
+        const cleanCand = cand.toLowerCase().trim()
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .replace(/[-_/]/g, ' ');
         for (const k of keys) {
           if (k === null || k === undefined) continue;
-          const cleanK = String(k).toLowerCase().trim().replace(/[-_]/g, ' ');
-          if (cleanK === cand || cleanK.includes(cand)) {
+          const cleanK = String(k).toLowerCase().trim()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .replace(/[-_/]/g, ' ');
+          if (cleanK === cleanCand || cleanK.includes(cleanCand) || cleanCand.includes(cleanK)) {
             return row[k];
           }
         }
       }
       return undefined;
+    }
+
+    function isBoolTrue(val) {
+      if (val === true || val === 1) return true;
+      if (val === false || val === 0 || val === null || val === undefined) return false;
+      const s = String(val).trim().toLowerCase();
+      return s === 'true' || s === 'si' || s === 'sí' || s === '1' || s === 'verdadero' || s === 'yes';
     }
 
     // AL ARRASTRAR O SELECCIONAR UN ARCHIVO (Lectura segura con file.text())
@@ -1485,6 +1497,7 @@
         fName.includes('sessionstartingcauses') || 
         fName.includes('startingcause') || 
         fName.includes('plantilla') || 
+        fName.includes('planilla') || 
         fName.includes('template') || 
         fName.includes('hsm') || 
         fName.includes('outbound') ||
@@ -1497,8 +1510,11 @@
       const sample = rows[0];
       const keys = Object.keys(sample).map(k => String(k).toLowerCase());
 
-      // 2. Detección por columnas típicas de reportes de plantillas / causas de inicio en Botmaker
+      // 2. Detección por columnas de reportes de plantillas / causas de inicio en Botmaker
       return keys.some(k => 
+        k.includes('respondida') ||
+        k.includes('leída') ||
+        k.includes('leida') ||
         k.includes('sentplural') || 
         k.includes('deliveredplural') || 
         k.includes('readplural') || 
@@ -1508,6 +1524,7 @@
         k.includes('inicios de sesión') || 
         k.includes('inicios de sesion') ||
         k.includes('causa de inicio') ||
+        k.includes('nombre plantilla') ||
         k.includes('nombre de plantilla')
       );
     }
@@ -1517,100 +1534,141 @@
       let totalDelivered = 0;
       let totalReplies = 0;
       let detectedChannel = '';
+      let detectedDates = [];
 
       if (!rows || !rows.length) {
-        return { fileName, sent: 0, delivered: 0, replies: 0 };
+        return { fileName, sent: 0, delivered: 0, replies: 0, reportDate: '' };
       }
 
-      // Detectar si el dataset tiene una fila de totales agregados (valores acumulados > 10 en sent)
-      // O si es un reporte fila por fila (donde cada fila es 1 notificación con valor 1 o estado)
-      let hasSummaryRow = false;
-      for (const r of rows) {
-        const sVal = Number(normalizeField(r, ['sentplural', 'enviadas', 'enviados', 'sent', 'total']) || 0);
-        if (sVal > 10) {
-          hasSummaryRow = true;
-          break;
-        }
-      }
+      // 1. Detección nativa del formato oficial de exportación de Botmaker
+      // Columnas: 'Enviado', 'Entregado', 'Leída', 'Respondida', 'No Enviado'
+      const sample = rows[0];
+      const hasBotmakerCols = sample && Object.keys(sample).some(k => {
+        const lk = String(k).toLowerCase();
+        return lk.includes('respondida') || lk.includes('entregado') || lk.includes('no enviado');
+      });
 
-      if (hasSummaryRow) {
-        let sumSent = 0, sumDelivered = 0, sumReplies = 0;
+      if (hasBotmakerCols) {
         rows.forEach(r => {
           if (!r || typeof r !== 'object') return;
-          const s = Number(normalizeField(r, ['sentplural', 'inicios de sesión', 'inicios de sesion', 'enviadas', 'enviados', 'sent', 'total']) || 0);
-          const d = Number(normalizeField(r, ['deliveredplural', 'entregadas', 'entregados', 'delivered', 'recibidas']) || 0);
-          let rep = Number(normalizeField(r, ['answeredplural', 'respuestas de usuarios', 'respuestas', 'respondidas', 'replies', 'contestadas']) || 0);
 
-          if (isNaN(rep) || rep === 0) {
-            const rawAns = String(normalizeField(r, ['respuestas de usuarios', 'respuesta', 'answered', 'replies']) || '').trim();
-            const numMatch = rawAns.match(/\d+/);
-            if (numMatch) rep = Number(numMatch[0]);
+          const noEnv = normalizeField(r, ['no enviado', 'notsent', 'not sent']);
+          const env = normalizeField(r, ['enviado', 'enviada', 'sent']);
+          const entr = normalizeField(r, ['entregado', 'entregada', 'delivered']);
+          const resp = normalizeField(r, ['respondida', 'respondido', 'answered', 'respuesta']);
+
+          // Enviada si Enviado=true O no es NoEnviado
+          if (isBoolTrue(env) || (!isBoolTrue(noEnv) && noEnv !== undefined)) {
+            totalSent++;
           }
 
-          sumSent += s;
-          sumDelivered += d;
-          sumReplies += rep;
+          // Entregada si Entregado=true
+          if (isBoolTrue(entr)) {
+            totalDelivered++;
+          }
 
+          // Respondida si Respondida=true
+          if (isBoolTrue(resp)) {
+            totalReplies++;
+          }
+
+          // Fecha
+          const dt = normalizeField(r, ['fecha/tiempo inicio sesión', 'fecha/tiempo inicio sesion', 'fecha/tiempo envío', 'fecha/tiempo envio', 'fecha sesión', 'fecha']);
+          if (dt) detectedDates.push(String(dt).split('T')[0]);
+
+          // Canal
           if (!detectedChannel) {
-            const ch = normalizeField(r, ['línea whatsapp', 'linea whatsapp', 'línea', 'linea', 'canal', 'channel']);
+            const ch = normalizeField(r, ['id canal', 'canal', 'channel']);
             if (ch) detectedChannel = String(ch);
           }
         });
 
-        totalSent = sumSent;
-        totalDelivered = sumDelivered > 0 ? sumDelivered : Math.round(sumSent * 0.98);
-        totalReplies = sumReplies;
+        if (totalSent === 0) totalSent = rows.length;
+        if (totalDelivered === 0) totalDelivered = totalSent;
+
       } else {
-        // Modo Granular (1 fila por notificación / causa de inicio)
-        let cSent = 0, cDelivered = 0, cReplies = 0;
-
-        rows.forEach(r => {
-          if (!r || typeof r !== 'object') return;
-
-          const st = String(normalizeField(r, ['estado', 'status', 'state', 'sesiones por estados', 'estado de sesión', 'estado de sesion', 'causa de inicio']) || '').toLowerCase();
-          const ans = String(normalizeField(r, ['respuestas de usuarios', 'respuestas de usuario', 'respuesta', 'answered', 'replied', 'user replies']) || '').toLowerCase().trim();
-
-          // Enviadas: si no es 'notsent' o 'no enviado'
-          if (!st.includes('notsent') && !st.includes('no enviad')) {
-            cSent++;
+        // 2. Comprobar si tiene filas con totales acumulados numéricos (ej. sentplural, etc.)
+        let hasSummaryRow = false;
+        for (const r of rows) {
+          const sVal = Number(normalizeField(r, ['sentplural', 'enviadas', 'enviados', 'sent', 'total']) || 0);
+          if (sVal > 10) {
+            hasSummaryRow = true;
+            break;
           }
+        }
 
-          // Entregadas: si fue delivered, read o answered
-          if (st.includes('deliver') || st.includes('read') || st.includes('answer') || st.includes('entregad') || st.includes('leid') || st.includes('respond')) {
-            cDelivered++;
-          }
+        if (hasSummaryRow) {
+          rows.forEach(r => {
+            if (!r || typeof r !== 'object') return;
+            const s = Number(normalizeField(r, ['sentplural', 'inicios de sesión', 'inicios de sesion', 'enviadas', 'enviados', 'sent', 'total']) || 0);
+            const d = Number(normalizeField(r, ['deliveredplural', 'entregadas', 'entregados', 'delivered', 'recibidas']) || 0);
+            let rep = Number(normalizeField(r, ['answeredplural', 'respuestas de usuarios', 'respuestas', 'respondidas', 'respondida', 'replies', 'contestadas']) || 0);
 
-          // Respuestas: si ans indica afirmativo ('sí', 'si', 'yes', 'true', '1') O el estado es 'answered'/'respond'
-          if (
-            ans === 'sí' || ans === 'si' || ans === 'yes' || ans === 'true' || ans === '1' ||
-            ans.startsWith('s') ||
-            st.includes('answer') || st.includes('respond')
-          ) {
-            cReplies++;
-          }
+            if (isNaN(rep) || rep === 0) {
+              const rawAns = String(normalizeField(r, ['respuestas de usuarios', 'respuesta', 'respondida', 'answered', 'replies']) || '').trim();
+              const numMatch = rawAns.match(/\d+/);
+              if (numMatch) rep = Number(numMatch[0]);
+            }
 
-          if (!detectedChannel) {
-            const ch = normalizeField(r, ['línea whatsapp', 'linea whatsapp', 'línea', 'linea', 'canal', 'channel']);
-            if (ch) detectedChannel = String(ch);
-          }
-        });
+            totalSent += s;
+            totalDelivered += d;
+            totalReplies += rep;
 
-        totalSent = cSent > 0 ? cSent : rows.length;
-        totalDelivered = cDelivered > 0 ? cDelivered : Math.round(totalSent * 0.98);
-        totalReplies = cReplies;
+            const dt = normalizeField(r, ['fecha', 'date']);
+            if (dt) detectedDates.push(String(dt).split('T')[0]);
+
+            if (!detectedChannel) {
+              const ch = normalizeField(r, ['línea whatsapp', 'linea whatsapp', 'línea', 'linea', 'canal', 'channel']);
+              if (ch) detectedChannel = String(ch);
+            }
+          });
+          if (totalDelivered === 0 && totalSent > 0) totalDelivered = Math.round(totalSent * 0.98);
+        } else {
+          // 3. Modo granular genérico
+          rows.forEach(r => {
+            if (!r || typeof r !== 'object') return;
+            const st = String(normalizeField(r, ['estado', 'status', 'state', 'sesiones por estados']) || '').toLowerCase();
+            const ans = normalizeField(r, ['respondida', 'respondido', 'respuestas de usuarios', 'respuestas', 'respuesta', 'answered', 'replied']);
+
+            if (!st.includes('notsent') && !st.includes('no enviad')) totalSent++;
+            if (st.includes('deliver') || st.includes('read') || st.includes('answer') || st.includes('entregad') || st.includes('leid') || st.includes('respond')) totalDelivered++;
+            if (isBoolTrue(ans) || st.includes('answer') || st.includes('respond')) totalReplies++;
+
+            const dt = normalizeField(r, ['fecha', 'date']);
+            if (dt) detectedDates.push(String(dt).split('T')[0]);
+
+            if (!detectedChannel) {
+              const ch = normalizeField(r, ['línea whatsapp', 'linea whatsapp', 'canal', 'channel']);
+              if (ch) detectedChannel = String(ch);
+            }
+          });
+          if (totalSent === 0) totalSent = rows.length;
+          if (totalDelivered === 0) totalDelivered = Math.round(totalSent * 0.98);
+        }
       }
 
       let suggestedName = '';
       if (detectedChannel) {
-        suggestedName = detectedChannel.split('-')[0].replace(/([A-Z])/g, ' $1').trim();
+        const parts = detectedChannel.split('-');
+        if (parts[0]) {
+          suggestedName = parts[0]
+            .replace(/([A-Z])/g, ' $1')
+            .replace(/^./, str => str.toUpperCase())
+            .trim();
+          if (suggestedName.toLowerCase() === 'asesoresmena') suggestedName = 'Asesores Mena';
+        }
       }
+
+      detectedDates.sort();
+      const reportDate = detectedDates.length ? detectedDates[detectedDates.length - 1] : '';
 
       return {
         fileName,
         suggestedName,
         sent: totalSent,
         delivered: totalDelivered,
-        replies: totalReplies
+        replies: totalReplies,
+        reportDate
       };
     }
 
