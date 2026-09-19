@@ -1959,10 +1959,15 @@
       try {
         const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}/history`);
         if (!res.ok) throw new Error("Error obteniendo historial");
-        const history = await res.json();
+        const resData = await res.json();
+        const history = Array.isArray(resData) ? resData : (resData.history || []);
+        const clientInfo = resData.client || {};
 
         if (!history || !history.length) {
           tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 24px; color: var(--text-muted);">Sin historial registrado para esta cuenta.</td></tr>';
+          if (summaryBox) {
+            summaryBox.innerHTML = `<div style="font-size: 12px; color: var(--text-muted);">Sin datos históricos suficientes para ${escapeHtml(clientInfo.name || clientId)}.</div>`;
+          }
           return;
         }
 
@@ -1976,21 +1981,22 @@
         const u = Number(latest.user_msgs || 0);
         const a = Number(latest.agent_msgs || 0);
         const b = Number(latest.bot_msgs || 0);
-        const totMsgs = u + a + b;
+        const totMsgs = latest.total_msgs !== undefined ? Number(latest.total_msgs) : (u + a + b);
         const ratioUA = a > 0 ? (u / a).toFixed(2) : (u > 0 ? '∞' : '0.00');
+        const latestDeltaPct = Number(latest.mom_sessions_pct ?? latest.delta_sessions_pct ?? 0);
 
         if (summaryBox) {
           summaryBox.innerHTML = `
             <div style="flex: 1; min-width: 180px;">
               <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Cuenta Monitoreada</div>
-              <div style="font-size: 16px; font-weight: 800; color: var(--text-main); margin-top: 2px;">${escapeHtml(latest.name || clientId)}</div>
+              <div style="font-size: 16px; font-weight: 800; color: var(--text-main); margin-top: 2px;">${escapeHtml(clientInfo.name || latest.name || clientId)}</div>
               <div style="font-size: 11px; color: var(--text-muted); font-family: monospace;">ID: ${escapeHtml(clientId)} • ${history.length} mes(es) registrados</div>
             </div>
             <div style="text-align: center; min-width: 120px;">
               <div style="font-size: 11px; font-weight: 700; color: var(--text-muted);">Sesiones Recientes</div>
               <div style="font-size: 18px; font-weight: 800; color: #4f46e5; font-family: monospace;">${Number(latest.sessions || 0).toLocaleString()}</div>
-              <div style="font-size: 10px; color: ${Number(latest.delta_sessions_pct || 0) >= 0 ? 'var(--success)' : 'var(--danger)'}; font-weight: 700;">
-                ${Number(latest.delta_sessions_pct || 0) >= 0 ? '+' : ''}${Number(latest.delta_sessions_pct || 0).toFixed(1)}% MoM
+              <div style="font-size: 10px; color: ${latestDeltaPct >= 0 ? 'var(--success)' : 'var(--danger)'}; font-weight: 700;">
+                ${latestDeltaPct >= 0 ? '↑ +' : '↓ '}${Math.abs(latestDeltaPct).toFixed(1)}% MoM
               </div>
             </div>
             <div style="text-align: center; min-width: 130px;">
@@ -2012,22 +2018,51 @@
           `;
         }
 
-        // Renderizar tabla cronológica individual
+        // Renderizar tabla cronológica individual con flechas de interacción
         tbody.innerHTML = '';
-        history.forEach(h => {
+        history.forEach((h, idx) => {
           const tr = document.createElement('tr');
-          const deltaAbs = Number(h.delta_sessions_abs || 0);
-          const deltaPct = Number(h.delta_sessions_pct || 0);
+          const prevH = idx > 0 ? history[idx - 1] : null;
+
+          const deltaAbs = h.mom_sessions_abs !== undefined ? Number(h.mom_sessions_abs) : (Number(h.sessions || 0) - (prevH ? Number(prevH.sessions || 0) : Number(h.prev_sessions || 0)));
+          const deltaPct = h.mom_sessions_pct !== undefined ? Number(h.mom_sessions_pct) : (prevH && prevH.sessions > 0 ? ((deltaAbs / prevH.sessions) * 100) : 0);
           const diffClass = deltaAbs >= 0 ? 'diff-pos' : 'diff-neg';
           const rowStatusBadgeClass = h.status === 'red' ? 'badge-red' : (h.status === 'yellow' ? 'badge-yellow' : 'badge-green');
           const rowStatusBadgeLabel = h.status === 'red' ? '🔴 Riesgo' : (h.status === 'yellow' ? '🟡 Precaución' : '🟢 Saludable');
+          
           const userMsgs = Number(h.user_msgs || 0);
           const agentMsgs = Number(h.agent_msgs || 0);
           const botMsgs = Number(h.bot_msgs || 0);
-          const totalMsgsRow = userMsgs + agentMsgs + botMsgs;
-          const shareBot = Number(h.share_bot || 0);
-          const shareAgent = Number(h.share_agent || 0);
-          const shareUser = Number(h.share_user || 0);
+          const totalMsgsRow = h.total_msgs !== undefined ? Number(h.total_msgs) : (userMsgs + agentMsgs + botMsgs);
+          
+          const convMsgs = botMsgs + agentMsgs;
+          const shareBot = convMsgs > 0 ? (botMsgs / convMsgs * 100) : (totalMsgsRow > 0 ? (botMsgs / totalMsgsRow * 100) : 0);
+          const shareAgent = convMsgs > 0 ? (agentMsgs / convMsgs * 100) : (totalMsgsRow > 0 ? (agentMsgs / totalMsgsRow * 100) : 0);
+          const shareUser = totalMsgsRow > 0 ? (userMsgs / totalMsgsRow * 100) : 0;
+
+          // Variación MoM de Interacción (Total Mensajes)
+          const prevTot = prevH ? (prevH.total_msgs !== undefined ? Number(prevH.total_msgs) : (Number(prevH.user_msgs || 0) + Number(prevH.agent_msgs || 0) + Number(prevH.bot_msgs || 0))) : 0;
+          const deltaTot = idx > 0 ? (totalMsgsRow - prevTot) : 0;
+          const deltaTotPct = (idx > 0 && prevTot > 0) ? ((deltaTot / prevTot) * 100) : 0;
+          
+          let totArrowBadge = '';
+          if (idx === 0) {
+            totArrowBadge = `<span style="font-size: 10px; color: #94a3b8; font-weight: 600; margin-left: 4px;">(Base)</span>`;
+          } else if (deltaTot > 0) {
+            totArrowBadge = `<span style="display:inline-flex; align-items:center; gap:2px; font-size:10px; font-weight:800; color:#10b981; background:#dcfce7; padding:2px 6px; border-radius:6px; margin-left:5px;" title="Interacción subió +${deltaTot.toLocaleString()} msgs (+${deltaTotPct.toFixed(1)}%)">↑ +${deltaTotPct.toFixed(0)}%</span>`;
+          } else if (deltaTot < 0) {
+            totArrowBadge = `<span style="display:inline-flex; align-items:center; gap:2px; font-size:10px; font-weight:800; color:#ef4444; background:#fee2e2; padding:2px 6px; border-radius:6px; margin-left:5px;" title="Interacción bajó ${deltaTot.toLocaleString()} msgs (${deltaTotPct.toFixed(1)}%)">↓ ${deltaTotPct.toFixed(0)}%</span>`;
+          } else {
+            totArrowBadge = `<span style="font-size: 10px; color: #94a3b8; margin-left: 5px;">➔ 0%</span>`;
+          }
+
+          // Flecha para respuestas directas de usuarios
+          const prevU = prevH ? Number(prevH.user_msgs || 0) : 0;
+          let uArrow = '';
+          if (idx > 0) {
+            if (userMsgs > prevU) uArrow = `<span style="color:#10b981; font-weight:800; margin-left:3px;" title="Respuestas de usuarios subieron">↑</span>`;
+            else if (userMsgs < prevU) uArrow = `<span style="color:#ef4444; font-weight:800; margin-left:3px;" title="Respuestas de usuarios bajaron">↓</span>`;
+          }
 
           tr.innerHTML = `
             <td style="font-weight: 700; font-family: monospace; white-space: nowrap;">📅 ${escapeHtml(h.report_date || 'Reciente')}</td>
@@ -2035,19 +2070,19 @@
             <td style="text-align: right; font-family: monospace; color: var(--text-muted);">${Number(h.prev_sessions || 0).toLocaleString()}</td>
             <td style="text-align: right;">
               <span class="diff-badge ${diffClass}">
-                ${deltaAbs >= 0 ? '+' : ''}${deltaAbs.toLocaleString()}
+                ${deltaAbs >= 0 ? '↑ +' : '↓ '}${Math.abs(deltaAbs).toLocaleString()}
               </span>
             </td>
             <td style="text-align: right;">
               <span class="diff-badge ${diffClass}">
-                ${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%
+                ${deltaPct >= 0 ? '↑ +' : '↓ '}${Math.abs(deltaPct).toFixed(1)}%
               </span>
             </td>
-            <td style="text-align: right; font-family: monospace; font-weight: 800;">
-              ${totalMsgsRow.toLocaleString()}
+            <td style="text-align: right; font-family: monospace; font-weight: 800; white-space: nowrap;">
+              ${totalMsgsRow.toLocaleString()}${totArrowBadge}
             </td>
             <td style="text-align: right; font-family: monospace; font-size: 11px;">
-              <span title="Mensajes Usuario" style="color: #4f46e5; font-weight: 700;">👤 ${userMsgs.toLocaleString()}</span><br>
+              <span title="Mensajes Usuario" style="color: #4f46e5; font-weight: 700;">👤 ${userMsgs.toLocaleString()}${uArrow}</span><br>
               <span title="Mensajes Asesor" style="color: #f59e0b; font-weight: 600;">👨‍💼 ${agentMsgs.toLocaleString()}</span> | 
               <span title="Mensajes Bot" style="color: #a855f7;">🤖 ${botMsgs.toLocaleString()}</span>
             </td>
@@ -3349,7 +3384,7 @@
                 <td><strong>📅 ${escapeHtml(h.report_date)}</strong> ${isSelectedPeriod ? '<span style="color:var(--primary); font-size:9px;">(Activo)</span>' : ''}</td>
                 <td style="text-align: right; font-family: monospace;">${Number(h.sessions || 0).toLocaleString()}</td>
                 <td style="text-align: right; font-family: monospace; color: ${deltaPct >= 0 ? 'var(--success)' : 'var(--danger)'};">
-                  ${deltaPct >= 0 ? '+' : ''}${deltaPct}% (${deltaAbs >= 0 ? '+' : ''}${deltaAbs.toLocaleString()})
+                  ${deltaPct >= 0 ? '↑ +' : '↓ '}${Math.abs(deltaPct)}% (${deltaAbs >= 0 ? '+' : ''}${deltaAbs.toLocaleString()})
                 </td>
                 <td style="text-align: right; font-family: monospace;">${Number(h.auto_ratio || 0).toFixed(0)}%</td>
                 <td style="text-align: right; font-family: monospace;">${Number(h.templates_sent || 0).toLocaleString()}</td>
@@ -3365,14 +3400,58 @@
 
         // Llenar tabla cronológica de Mensajes (Pestaña 2)
         if (msgTbody) {
-          msgTbody.innerHTML = currentClientHistory.map(h => {
+          msgTbody.innerHTML = currentClientHistory.map((h, idx) => {
             const u = Number(h.user_msgs || 0);
             const a = Number(h.agent_msgs || 0);
             const b = Number(h.bot_msgs || 0);
-            const tot = u + a + b;
+            const tot = h.total_msgs !== undefined ? Number(h.total_msgs) : (u + a + b);
             const uPct = tot > 0 ? (u / tot * 100).toFixed(0) : 0;
             const aPct = tot > 0 ? (a / tot * 100).toFixed(0) : 0;
             const ratio = a > 0 ? (u / a).toFixed(2) : (u > 0 ? '∞' : '0.00');
+
+            const prevH = idx > 0 ? currentClientHistory[idx - 1] : null;
+            const prevTot = prevH ? (prevH.total_msgs !== undefined ? Number(prevH.total_msgs) : (Number(prevH.user_msgs || 0) + Number(prevH.agent_msgs || 0) + Number(prevH.bot_msgs || 0))) : 0;
+            const deltaTot = idx > 0 ? (tot - prevTot) : 0;
+            const deltaTotPct = (idx > 0 && prevTot > 0) ? ((deltaTot / prevTot) * 100) : 0;
+
+            const prevU = prevH ? Number(prevH.user_msgs || 0) : 0;
+            const deltaU = idx > 0 ? (u - prevU) : 0;
+
+            const prevA = prevH ? Number(prevH.agent_msgs || 0) : 0;
+            const prevRatio = prevA > 0 ? (prevU / prevA) : 0;
+
+            // Insignia de variación con flecha verde ↑ o roja ↓ en Total Mensajes
+            let totBadge = '';
+            if (idx === 0) {
+              totBadge = `<span style="font-size: 10px; color: #94a3b8; font-weight: 600; margin-left: 4px;">(Base)</span>`;
+            } else if (deltaTot > 0) {
+              totBadge = `<span style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 800; color: #10b981; background: #dcfce7; padding: 2px 6px; border-radius: 6px; margin-left: 5px;" title="Interacción subió +${deltaTot.toLocaleString()} msgs (+${deltaTotPct.toFixed(1)}%)">↑ +${deltaTotPct.toFixed(0)}%</span>`;
+            } else if (deltaTot < 0) {
+              totBadge = `<span style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 800; color: #ef4444; background: #fee2e2; padding: 2px 6px; border-radius: 6px; margin-left: 5px;" title="Interacción bajó ${deltaTot.toLocaleString()} msgs (${deltaTotPct.toFixed(1)}%)">↓ ${deltaTotPct.toFixed(0)}%</span>`;
+            } else {
+              totBadge = `<span style="font-size: 10px; color: #94a3b8; font-weight: 600; margin-left: 5px;">➔ 0%</span>`;
+            }
+
+            // Flecha verde o roja en respuestas de usuario
+            let uArrow = '';
+            if (idx > 0) {
+              if (deltaU > 0) {
+                uArrow = `<span style="color: #10b981; font-weight: 800; font-size: 11px; margin-left: 3px;" title="Respuestas de usuarios subieron +${deltaU.toLocaleString()}">↑</span>`;
+              } else if (deltaU < 0) {
+                uArrow = `<span style="color: #ef4444; font-weight: 800; font-size: 11px; margin-left: 3px;" title="Respuestas de usuarios bajaron ${deltaU.toLocaleString()}">↓</span>`;
+              }
+            }
+
+            // Flecha en ratio de interacción
+            let ratioArrow = '';
+            if (idx > 0 && prevA > 0 && a > 0) {
+              const rDiff = (u / a) - prevRatio;
+              if (rDiff > 0.05) {
+                ratioArrow = `<span style="color: #10b981; font-weight: 800; font-size: 11px; margin-left: 3px;" title="Mejor retorno de interacción por asesor">↑</span>`;
+              } else if (rDiff < -0.05) {
+                ratioArrow = `<span style="color: #ef4444; font-weight: 800; font-size: 11px; margin-left: 3px;" title="Menor respuesta de usuarios por asesor">↓</span>`;
+              }
+            }
 
             let diag = '🟢 Interacción Fluida';
             let diagColor = '#10b981';
@@ -3392,14 +3471,14 @@
               <tr style="${isSelectedPeriod ? 'background: #f5f3ff; font-weight: bold;' : ''}">
                 <td><strong>📅 ${escapeHtml(h.report_date)}</strong> ${isSelectedPeriod ? '<span style="color:var(--primary); font-size:9px;">(Activo)</span>' : ''}</td>
                 <td style="text-align: right; font-family: monospace;">${Number(h.sessions || 0).toLocaleString()}</td>
-                <td style="text-align: right; font-family: monospace; font-weight: 700; color: #4f46e5;">${u.toLocaleString()}</td>
+                <td style="text-align: right; font-family: monospace; font-weight: 700; color: #4f46e5;">${u.toLocaleString()}${uArrow}</td>
                 <td style="text-align: right; font-family: monospace; font-weight: 700; color: #f59e0b;">${a.toLocaleString()}</td>
                 <td style="text-align: right; font-family: monospace; color: #a855f7;">${b.toLocaleString()}</td>
-                <td style="text-align: right; font-family: monospace; font-weight: 800;">${tot.toLocaleString()}</td>
+                <td style="text-align: right; font-family: monospace; font-weight: 800; white-space: nowrap;">${tot.toLocaleString()}${totBadge}</td>
                 <td style="text-align: right; font-family: monospace; color: #4f46e5;">${uPct}%</td>
                 <td style="text-align: right; font-family: monospace; color: #f59e0b;">${aPct}%</td>
-                <td style="text-align: right; font-family: monospace; font-weight: 800; color: ${a > 0 && (u / a) < 0.6 ? '#ef4444' : '#10b981'};">
-                  ${ratio}x
+                <td style="text-align: right; font-family: monospace; font-weight: 800; color: ${a > 0 && (u / a) < 0.6 ? '#ef4444' : '#10b981'}; white-space: nowrap;">
+                  ${ratio}x${ratioArrow}
                 </td>
                 <td style="text-align: center;"><span style="font-size: 11px; font-weight: 700; color: ${diagColor};">${diag}</span></td>
               </tr>
