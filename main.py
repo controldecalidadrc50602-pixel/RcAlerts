@@ -70,40 +70,78 @@ class IngestClientItem(BaseModel):
     templates_replies: int = 0
     report_date: Optional[str] = None
 
+def ensure_tables():
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"Warning ensuring tables: {e}")
+
+@app.get("/api/health-db")
+@app.get("/health-db")
+def health_db(db: Session = Depends(get_db)):
+    from backend.database import DATABASE_URL
+    from sqlalchemy import text
+    try:
+        ensure_tables()
+        res = db.execute(text("SELECT 1;")).fetchone()
+        masked = DATABASE_URL.split("@")[-1] if "@" in DATABASE_URL else DATABASE_URL
+        return {"status": "ok", "db_connected": True, "target": masked, "test_query": res[0]}
+    except Exception as e:
+        return {"status": "error", "db_connected": False, "error": str(e)}
+
 # Rutas API (Dual Decorator para compatibilidad local y Vercel rewrites)
 @app.get("/api/clients")
 @app.get("/clients")
 def get_clients(seed_demo: bool = False, db: Session = Depends(get_db)):
-    clients = crud.get_clients_with_latest_metric(db)
-    if not clients and seed_demo:
-        crud.seed_demo_data(db)
-        clients = crud.get_clients_with_latest_metric(db)
-    return clients
+    try:
+        return crud.get_clients_with_latest_metric(db)
+    except Exception as err:
+        print(f"Retrying get_clients after ensuring tables: {err}")
+        try:
+            ensure_tables()
+            return crud.get_clients_with_latest_metric(db)
+        except Exception as err2:
+            print(f"Database error in get_clients: {err2}")
+            return []
 
 @app.delete("/api/clients/{client_id}")
 @app.delete("/clients/{client_id}")
 def delete_client(client_id: str, db: Session = Depends(get_db)):
-    deleted = crud.delete_client(db, client_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    return {"status": "deleted", "client_id": client_id}
+    try:
+        deleted = crud.delete_client(db, client_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        return {"status": "deleted", "client_id": client_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/clear-db")
 @app.post("/clear-db")
 def clear_database(db: Session = Depends(get_db)):
-    crud.clear_all_data(db)
-    return {"status": "cleared", "message": "Base de datos vaciada con éxito. Lista para datos reales."}
+    try:
+        ensure_tables()
+        crud.clear_all_data(db)
+        return {"status": "cleared", "message": "Base de datos vaciada con éxito. Lista para datos reales."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/ingest")
 @app.post("/ingest")
 def ingest_clients(items: List[IngestClientItem], db: Session = Depends(get_db)):
-    processed = []
-    for item in items:
-        raw_dict = item.model_dump()
-        rep_date = date.fromisoformat(item.report_date) if item.report_date else date.today()
-        client = crud.upsert_client_and_metric(db, raw_dict, report_date=rep_date)
-        processed.append(client.id)
-    return {"status": "ok", "ingested_count": len(processed), "client_ids": processed}
+    try:
+        ensure_tables()
+        processed = []
+        for item in items:
+            raw_dict = item.model_dump()
+            rep_date = date.fromisoformat(item.report_date) if item.report_date else date.today()
+            client = crud.upsert_client_and_metric(db, raw_dict, report_date=rep_date)
+            processed.append(client.id)
+        return {"status": "ok", "ingested_count": len(processed), "client_ids": processed}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en ingesta: {str(e)}")
+
 
 @app.post("/api/seed-demo")
 @app.post("/seed-demo")
