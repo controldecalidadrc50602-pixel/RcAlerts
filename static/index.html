@@ -354,6 +354,7 @@
 
       <!-- Fichas de Clientes -->
       <div style="margin-top: 24px;">
+        <div id="orphan-merge-banner" class="hidden" style="margin-bottom: 16px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 8px;"></div>
         <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 12px;">Clientes Monitoreados en Cartera</h3>
         <div id="empty-state" class="empty-state hidden">
           <div style="font-size: 40px; margin-bottom: 8px;">📂</div>
@@ -461,6 +462,19 @@
 
         <form id="ingest-form" onsubmit="return false;">
           <div class="modal-form-grid">
+            <div class="form-group" style="grid-column: span 2; background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">
+              <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <span>🏢 <strong>Consolidar en Cliente:</strong></span>
+                <span id="badge-merge-mode" style="font-size: 10px; color: #4338ca; background: #e0e7ff; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✨ Una sola casilla unificada</span>
+              </label>
+              <select id="sel-target-client" class="form-input" style="font-weight: 600; font-size: 13px; background: white;">
+                <option value="__NEW__">➕ Crear como nuevo cliente en la cartera</option>
+              </select>
+              <p id="msg-merge-info" style="font-size: 11px; color: var(--text-muted); margin-top: 4px; margin-bottom: 0;">
+                Elige el cliente para correlacionar sesiones y plantillas en una sola casilla sin duplicar.
+              </p>
+            </div>
+
             <div class="form-group" style="grid-column: span 2;">
               <label class="form-label">Nombre del Cliente / Empresa *</label>
               <input type="text" id="inp-client-name" class="form-input" required placeholder="Ej. Asesores Mena, Clínica Sonrisas...">
@@ -705,6 +719,29 @@
       document.getElementById('count-yellow').textContent = counts.yellow || 0;
       document.getElementById('count-green').textContent = counts.green || 0;
 
+      // Detección automática de tarjeta huérfana de plantillas
+      const orphanClient = clientsData.find(c => (c.name || '').toLowerCase().includes('sessionstartingcauses'));
+      const mainClient = clientsData.find(c => c.id !== orphanClient?.id && !(c.name || '').toLowerCase().includes('sessionstartingcauses'));
+      const orphanBannerEl = document.getElementById('orphan-merge-banner');
+      if (orphanClient && mainClient && orphanBannerEl) {
+        orphanBannerEl.classList.remove('hidden');
+        orphanBannerEl.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div>
+              <span style="font-size: 13px; font-weight: 700; color: #92400e;">⚠️ Reporte de plantillas desvinculado detectado ("${escapeHtml(orphanClient.name)}")</span>
+              <p style="font-size: 11px; color: #b45309; margin: 2px 0 0 0;">
+                Contiene <strong>${Number(orphanClient.templates_sent || 0).toLocaleString()} plantillas</strong> con <strong>${Number(orphanClient.reply_rate || 0).toFixed(1)}% de respuesta</strong> correspondientes a <strong>${escapeHtml(mainClient.name)}</strong>.
+              </p>
+            </div>
+            <button onclick="triggerAutoMerge('${orphanClient.id}', '${mainClient.id}')" class="btn btn-sm" style="background: #f59e0b; color: white; border: none; font-weight: 700; padding: 6px 14px; border-radius: 6px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">
+              ⚡ Unificar en una sola casilla con "${escapeHtml(mainClient.name)}"
+            </button>
+          </div>
+        `;
+      } else if (orphanBannerEl) {
+        orphanBannerEl.classList.add('hidden');
+      }
+
       const filtered = getFilteredClients();
 
       filtered.forEach(c => {
@@ -759,9 +796,12 @@
             </div>
           </div>
 
-          <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
-            <span style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📍 ${escapeHtml(c.industry || 'General')} • ${Number(c.portfolio_share_sessions || 0).toFixed(1)}% cartera</span>
-            <span style="font-weight: 700; color: var(--primary);">Ver Detalle →</span>
+          <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📍 ${escapeHtml(c.industry || 'General')} • ${Number(c.portfolio_share_sessions || 0).toFixed(1)}%</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button onclick="event.stopPropagation(); openIngestForClient('${c.id}')" class="btn btn-sm" style="font-size: 10px; padding: 2px 7px; background: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; border-radius: 6px; cursor: pointer; font-weight: 600;" title="Adjuntar archivo de sesiones o plantillas para este cliente">📎 Adjuntar Archivos</button>
+              <span style="font-weight: 700; color: var(--primary);">Ver Detalle →</span>
+            </div>
           </div>
         `;
         grid.appendChild(card);
@@ -1138,8 +1178,99 @@
       };
     }
 
+    // POBLAR SELECTOR DE CLIENTES EXISTENTES PARA FUSIÓN
+    function populateTargetClients(selectedId = null) {
+      const sel = document.getElementById('sel-target-client');
+      if (!sel) return;
+      sel.innerHTML = '<option value="__NEW__">➕ Crear como nuevo cliente en la cartera</option>';
+
+      const validClients = clientsData.filter(c => c.id && !(c.name || '').toLowerCase().includes('sessionstartingcauses'));
+      validClients.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `🏢 ${c.name} (${Number(c.sessions || 0).toLocaleString()} sesiones)`;
+        sel.appendChild(opt);
+      });
+
+      if (selectedId) {
+        sel.value = selectedId;
+      }
+    }
+
+    function applySelectedClient(selectedId) {
+      const nameEl = document.getElementById('inp-client-name');
+      const idEl = document.getElementById('inp-client-id');
+      const indEl = document.getElementById('inp-client-industry');
+      const webEl = document.getElementById('inp-client-website');
+      const focEl = document.getElementById('inp-client-focus');
+      const dateEl = document.getElementById('inp-client-date');
+      const prevSessEl = document.getElementById('inp-client-prev-sessions');
+      const lblSessFile = document.getElementById('lbl-sessions-file');
+      const lblSessStats = document.getElementById('lbl-sessions-stats');
+
+      if (selectedId === '__NEW__') {
+        if (nameEl) { nameEl.disabled = false; }
+        if (idEl) { idEl.disabled = false; }
+        if (pendingSessionsData) {
+          if (nameEl) nameEl.value = pendingSessionsData.suggestedName;
+          if (idEl) idEl.value = `CLI-${pendingSessionsData.suggestedName.toUpperCase().replace(/[^A-Z0-9]/g, '-').slice(0, 10)}`;
+        } else {
+          if (nameEl) nameEl.value = '';
+          if (idEl) idEl.value = '';
+        }
+      } else {
+        const client = clientsData.find(c => c.id === selectedId);
+        if (client) {
+          if (nameEl) { nameEl.value = client.name; nameEl.disabled = true; }
+          if (idEl) { idEl.value = client.id; idEl.disabled = true; }
+          if (indEl) indEl.value = client.industry || 'General';
+          if (webEl) webEl.value = client.website || 'https://sin-web.com';
+          if (focEl) focEl.value = client.focus || 'Atención multicanal';
+          if (dateEl && !dateEl.value) dateEl.value = client.report_date || new Date().toISOString().split('T')[0];
+          if (prevSessEl) prevSessEl.value = client.prev_sessions || client.sessions;
+
+          // Si no se adjuntó un nuevo archivo de sesiones, tomar los números ya registrados en la cartera
+          if (!pendingSessionsData) {
+            document.getElementById('sum-sessions').textContent = Number(client.sessions || 0).toLocaleString();
+            document.getElementById('sum-user-msgs').textContent = Number(client.user_msgs || 0).toLocaleString();
+            document.getElementById('sum-bot-msgs').textContent = Number(client.bot_msgs || 0).toLocaleString();
+            document.getElementById('sum-agent-msgs').textContent = Number(client.agent_msgs || 0).toLocaleString();
+
+            if (lblSessFile) lblSessFile.textContent = `Sesiones activas registradas de ${client.name}`;
+            if (lblSessStats) lblSessStats.textContent = `${Number(client.sessions || 0).toLocaleString()} sesiones | ${Number(client.total_msgs || (client.user_msgs + client.bot_msgs + client.agent_msgs)).toLocaleString()} mensajes`;
+          }
+        }
+      }
+    }
+
+    document.getElementById('sel-target-client')?.addEventListener('change', function(e) {
+      applySelectedClient(e.target.value);
+    });
+
     // CORRELACIÓN Y RENDERIZADO DEL MODAL CONSOLIDADO
-    function renderIngestModal() {
+    function renderIngestModal(targetId = null) {
+      populateTargetClients();
+      const sel = document.getElementById('sel-target-client');
+
+      // Auto-detección inteligente del cliente destino
+      const validClients = clientsData.filter(c => c.id && !(c.name || '').toLowerCase().includes('sessionstartingcauses'));
+      let chosenId = targetId;
+
+      if (!chosenId) {
+        if (pendingSessionsData) {
+          const match = validClients.find(c => c.name.toLowerCase() === pendingSessionsData.suggestedName.toLowerCase());
+          if (match) chosenId = match.id;
+        } else if (pendingTemplatesData && validClients.length > 0) {
+          // Si solo entra el archivo de plantillas, pre-asociar al primer cliente válido de la cartera
+          chosenId = validClients[0].id;
+        }
+      }
+
+      if (sel) {
+        sel.value = chosenId || '__NEW__';
+      }
+      applySelectedClient(chosenId || '__NEW__');
+
       const nameEl = document.getElementById('inp-client-name');
       const idEl = document.getElementById('inp-client-id');
       const dateEl = document.getElementById('inp-client-date');
@@ -1154,12 +1285,12 @@
       const lblTplFile = document.getElementById('lbl-templates-file');
       const lblTplStats = document.getElementById('lbl-templates-stats');
 
-      // 1. Integrar Datos de Sesiones
+      // 1. Integrar Datos de Sesiones si existen
       if (pendingSessionsData) {
-        if (nameEl) {
+        if (nameEl && !nameEl.disabled) {
           nameEl.value = pendingSessionsData.suggestedName;
         }
-        if (idEl) {
+        if (idEl && !idEl.disabled) {
           idEl.value = `CLI-${pendingSessionsData.suggestedName.toUpperCase().replace(/[^A-Z0-9]/g, '-').slice(0, 10)}`;
         }
         if (dateEl && pendingSessionsData.reportDate) {
@@ -1176,13 +1307,6 @@
         document.getElementById('sum-user-msgs').textContent = pendingSessionsData.userMsgs.toLocaleString();
         document.getElementById('sum-bot-msgs').textContent = pendingSessionsData.botMsgs.toLocaleString();
         document.getElementById('sum-agent-msgs').textContent = pendingSessionsData.agentMsgs.toLocaleString();
-      } else {
-        if (lblSessFile) lblSessFile.textContent = "Sin adjuntar aún (haz clic en Adjuntar Sesiones)";
-        if (lblSessStats) lblSessStats.textContent = "0 sesiones";
-        document.getElementById('sum-sessions').textContent = '0';
-        document.getElementById('sum-user-msgs').textContent = '0';
-        document.getElementById('sum-bot-msgs').textContent = '0';
-        document.getElementById('sum-agent-msgs').textContent = '0';
       }
 
       // 2. Integrar Datos de Plantillas
@@ -1197,31 +1321,57 @@
 
         if (lblTplFile) lblTplFile.textContent = pendingTemplatesData.fileName;
         if (lblTplStats) lblTplStats.textContent = `${pendingTemplatesData.sent.toLocaleString()} env | ${pendingTemplatesData.delivered.toLocaleString()} entregadas | ${pendingTemplatesData.replies.toLocaleString()} resp (${rate}%)`;
-
-        // Si aún no hay nombre asignado y no hay archivo de sesiones
-        if (!pendingSessionsData && nameEl && (!nameEl.value || nameEl.value.includes('sessionStartingCauses'))) {
-          nameEl.value = pendingTemplatesData.suggestedName || '';
-          nameEl.placeholder = 'Ingresa el nombre del cliente (ej. Asesores Mena)';
-        }
       } else {
         if (lblTplFile) lblTplFile.textContent = "Sin archivo adjunto (opcional)";
         if (lblTplStats) lblTplStats.textContent = "--";
       }
 
       // 3. Buffer Consolidado Listo para Ingesta
+      const selClientObj = sel && sel.value !== '__NEW__' ? clientsData.find(c => c.id === sel.value) : null;
+
       pendingClientData = {
-        suggestedName: nameEl?.value || 'Cliente',
-        sessions: pendingSessionsData?.sessions || 0,
-        userMsgs: pendingSessionsData?.userMsgs || 0,
-        botMsgs: pendingSessionsData?.botMsgs || 0,
-        agentMsgs: pendingSessionsData?.agentMsgs || 0,
+        suggestedName: nameEl?.value || selClientObj?.name || 'Cliente',
+        sessions: pendingSessionsData?.sessions || (selClientObj ? selClientObj.sessions : 0),
+        userMsgs: pendingSessionsData?.userMsgs || (selClientObj ? selClientObj.user_msgs : 0),
+        botMsgs: pendingSessionsData?.botMsgs || (selClientObj ? selClientObj.bot_msgs : 0),
+        agentMsgs: pendingSessionsData?.agentMsgs || (selClientObj ? selClientObj.agent_msgs : 0),
         templatesSent: pendingTemplatesData?.sent || Number(tSentEl?.value || 0),
         templatesDelivered: pendingTemplatesData?.delivered || Number(tDelEl?.value || 0),
         templatesReplies: pendingTemplatesData?.replies || Number(tRepEl?.value || 0),
-        reportDate: dateEl?.value || new Date().toISOString().split('T')[0]
+        reportDate: dateEl?.value || (selClientObj ? selClientObj.report_date : new Date().toISOString().split('T')[0])
       };
 
       document.getElementById('ingest-modal')?.classList.remove('hidden');
+    }
+
+    // ACCIÓN DIRECTA DESDE LA TARJETA
+    function openIngestForClient(clientId) {
+      pendingSessionsData = null;
+      pendingTemplatesData = null;
+      renderIngestModal(clientId);
+      const c = clientsData.find(cl => cl.id === clientId);
+      showToast(`📎 Modal preparado para ${c ? c.name : 'el cliente'}. Adjunta las plantillas o sesiones.`);
+    }
+
+    // FUSIÓN AUTOMÁTICA DE TARJETA HUÉRFANA
+    async function triggerAutoMerge(sourceId, targetId) {
+      showToast("⏳ Unificando plantillas en una sola casilla...");
+      try {
+        const res = await fetch('/api/clients/merge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source_id: sourceId, target_id: targetId })
+        });
+        if (res.ok) {
+          showToast("✨ Reportes unificados exitosamente en una sola casilla");
+          await fetchClients();
+        } else {
+          showToast("❌ Error al unificar registros");
+        }
+      } catch (err) {
+        console.error(err);
+        showToast("⚠️ Error de comunicación con el backend");
+      }
     }
 
     async function handleIncomingFiles(filesList) {
@@ -1246,11 +1396,11 @@
         renderIngestModal();
 
         if (pendingSessionsData && pendingTemplatesData) {
-          showToast("✨ Sesiones y Plantillas correlacionadas con éxito");
+          showToast("✨ Sesiones y Plantillas unificadas en una sola casilla");
         } else if (pendingSessionsData) {
           showToast("📊 Archivo de sesiones procesado");
         } else if (pendingTemplatesData) {
-          showToast("📨 Reporte de plantillas procesado");
+          showToast("📨 Reporte de plantillas procesado y correlacionado");
         }
       } catch (err) {
         console.error("Error en handleIncomingFiles:", err);
@@ -1279,8 +1429,11 @@
         return;
       }
 
-      const name = (document.getElementById('inp-client-name')?.value || '').trim();
-      const dateVal = document.getElementById('inp-client-date')?.value || '';
+      const sel = document.getElementById('sel-target-client');
+      const selClientObj = sel && sel.value !== '__NEW__' ? clientsData.find(c => c.id === sel.value) : null;
+
+      const name = (document.getElementById('inp-client-name')?.value || selClientObj?.name || '').trim();
+      const dateVal = document.getElementById('inp-client-date')?.value || selClientObj?.report_date || '';
 
       if (!name) {
         alert("Por favor ingresa el nombre del cliente.");
@@ -1291,17 +1444,29 @@
         return;
       }
 
+      let sCount = Number(pendingClientData.sessions || 0);
+      let uMsgs = Number(pendingClientData.userMsgs || 0);
+      let bMsgs = Number(pendingClientData.botMsgs || 0);
+      let aMsgs = Number(pendingClientData.agentMsgs || 0);
+
+      if (sCount === 0 && selClientObj && Number(selClientObj.sessions || 0) > 0) {
+        sCount = Number(selClientObj.sessions || 0);
+        uMsgs = Number(selClientObj.user_msgs || 0);
+        bMsgs = Number(selClientObj.bot_msgs || 0);
+        aMsgs = Number(selClientObj.agent_msgs || 0);
+      }
+
       const clientPayload = {
-        id: (document.getElementById('inp-client-id')?.value || '').trim() || `CLI-${Math.floor(100 + Math.random() * 900)}`,
+        id: (document.getElementById('inp-client-id')?.value || selClientObj?.id || '').trim() || `CLI-${Math.floor(100 + Math.random() * 900)}`,
         name: name,
-        website: (document.getElementById('inp-client-website')?.value || '').trim() || "https://sin-web.com",
-        industry: (document.getElementById('inp-client-industry')?.value || '').trim() || "General",
-        focus: (document.getElementById('inp-client-focus')?.value || '').trim() || "Atención multicanal",
-        sessions: Number(pendingClientData.sessions || 0),
-        prev_sessions: Number(document.getElementById('inp-client-prev-sessions')?.value || pendingClientData.sessions),
-        user_msgs: Number(pendingClientData.userMsgs || 0),
-        bot_msgs: Number(pendingClientData.botMsgs || 0),
-        agent_msgs: Number(pendingClientData.agentMsgs || 0),
+        website: (document.getElementById('inp-client-website')?.value || selClientObj?.website || '').trim() || "https://sin-web.com",
+        industry: (document.getElementById('inp-client-industry')?.value || selClientObj?.industry || '').trim() || "General",
+        focus: (document.getElementById('inp-client-focus')?.value || selClientObj?.focus || '').trim() || "Atención multicanal",
+        sessions: sCount,
+        prev_sessions: Number(document.getElementById('inp-client-prev-sessions')?.value || selClientObj?.prev_sessions || sCount),
+        user_msgs: uMsgs,
+        bot_msgs: bMsgs,
+        agent_msgs: aMsgs,
         templates_sent: Number(document.getElementById('inp-client-templates-sent')?.value || 0),
         templates_delivered: Number(document.getElementById('inp-client-templates-delivered')?.value || 0),
         templates_replies: Number(document.getElementById('inp-client-templates-replies')?.value || 0),

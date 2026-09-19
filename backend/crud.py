@@ -88,18 +88,34 @@ def upsert_client_and_metric(db: Session, data: dict, report_date: date = None):
     templates_delivered = int(data.get("templates_delivered", 0))
     templates_replies = int(data.get("templates_replies", 0))
 
+    # Buscar métrica existente para este cliente en esta fecha o la última registrada
+    metric = db.query(WeeklyMetric).filter(
+        WeeklyMetric.client_id == client.id,
+        WeeklyMetric.report_date == report_date
+    ).first()
+
+    existing_metric = metric or db.query(WeeklyMetric).filter(WeeklyMetric.client_id == client.id).order_by(WeeklyMetric.report_date.desc()).first()
+
+    # Consolidación no-destructiva: si vienen sesiones en 0 pero ya había sesiones registradas, conservarlas
+    if sessions == 0 and existing_metric and existing_metric.sessions > 0:
+        sessions = existing_metric.sessions
+        prev_sessions = existing_metric.prev_sessions
+        user_msgs = existing_metric.user_msgs
+        bot_msgs = existing_metric.bot_msgs
+        agent_msgs = existing_metric.agent_msgs
+
+    # Si vienen plantillas en 0 pero ya había plantillas registradas, conservarlas
+    if templates_sent == 0 and existing_metric and existing_metric.templates_sent > 0:
+        templates_sent = existing_metric.templates_sent
+        templates_delivered = existing_metric.templates_delivered
+        templates_replies = existing_metric.templates_replies
+
     health = compute_health(
         sessions=sessions, prev_sessions=prev_sessions,
         user_msgs=user_msgs, bot_msgs=bot_msgs, agent_msgs=agent_msgs,
         templates_sent=templates_sent, templates_delivered=templates_delivered,
         templates_replies=templates_replies
     )
-
-    # Buscar si ya existe métrica para este cliente en esta fecha
-    metric = db.query(WeeklyMetric).filter(
-        WeeklyMetric.client_id == client.id,
-        WeeklyMetric.report_date == report_date
-    ).first()
 
     if not metric:
         metric = WeeklyMetric(
@@ -128,6 +144,52 @@ def upsert_client_and_metric(db: Session, data: dict, report_date: date = None):
     db.commit()
     db.refresh(client)
     return client
+
+def merge_clients(db: Session, source_id: str, target_id: str):
+    target = db.query(Client).filter(Client.id == target_id).first()
+    source = db.query(Client).filter(Client.id == source_id).first()
+    if not target or not source:
+        return False
+
+    # Obtener las métricas más recientes de ambos
+    target_metric = db.query(WeeklyMetric).filter(WeeklyMetric.client_id == target_id).order_by(WeeklyMetric.report_date.desc()).first()
+    source_metric = db.query(WeeklyMetric).filter(WeeklyMetric.client_id == source_id).order_by(WeeklyMetric.report_date.desc()).first()
+
+    if source_metric:
+        if not target_metric:
+            source_metric.client_id = target_id
+        else:
+            # Fusionar plantillas si source las tiene y target no
+            if source_metric.templates_sent > 0 and target_metric.templates_sent == 0:
+                target_metric.templates_sent = source_metric.templates_sent
+                target_metric.templates_delivered = source_metric.templates_delivered
+                target_metric.templates_replies = source_metric.templates_replies
+            # Fusionar sesiones si source las tiene y target no
+            if source_metric.sessions > 0 and target_metric.sessions == 0:
+                target_metric.sessions = source_metric.sessions
+                target_metric.prev_sessions = source_metric.prev_sessions
+                target_metric.user_msgs = source_metric.user_msgs
+                target_metric.bot_msgs = source_metric.bot_msgs
+                target_metric.agent_msgs = source_metric.agent_msgs
+
+            health = compute_health(
+                sessions=target_metric.sessions, prev_sessions=target_metric.prev_sessions,
+                user_msgs=target_metric.user_msgs, bot_msgs=target_metric.bot_msgs, agent_msgs=target_metric.agent_msgs,
+                templates_sent=target_metric.templates_sent, templates_delivered=target_metric.templates_delivered,
+                templates_replies=target_metric.templates_replies
+            )
+            target_metric.auto_ratio = health["auto_ratio"]
+            target_metric.delivery_rate = health["delivery_rate"]
+            target_metric.reply_rate = health["reply_rate"]
+            target_metric.churn_score = health["churn_score"]
+            target_metric.status = health["status"]
+            target_metric.issues = json.dumps(health["issues"], ensure_ascii=False)
+
+    # Eliminar métricas restantes de source y eliminar source client
+    db.query(WeeklyMetric).filter(WeeklyMetric.client_id == source_id).delete()
+    db.delete(source)
+    db.commit()
+    return True
 
 def delete_client(db: Session, client_id: str):
     client = db.query(Client).filter(Client.id == client_id).first()

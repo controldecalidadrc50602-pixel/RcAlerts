@@ -70,6 +70,11 @@ class IngestClientItem(BaseModel):
     templates_replies: int = 0
     report_date: Optional[str] = None
 
+class MergeClientsRequest(BaseModel):
+    source_id: str
+    target_id: str
+
+
 def ensure_tables():
     try:
         Base.metadata.create_all(bind=engine)
@@ -112,6 +117,20 @@ def delete_client(client_id: str, db: Session = Depends(get_db)):
         if not deleted:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
         return {"status": "deleted", "client_id": client_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/clients/merge")
+@app.post("/clients/merge")
+def merge_clients_endpoint(req: MergeClientsRequest, db: Session = Depends(get_db)):
+    try:
+        ensure_tables()
+        success = crud.merge_clients(db, req.source_id, req.target_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Uno o ambos clientes no existen")
+        return {"status": "ok", "message": f"Cliente {req.source_id} fusionado exitosamente en {req.target_id}"}
     except HTTPException:
         raise
     except Exception as e:
