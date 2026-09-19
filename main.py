@@ -48,8 +48,9 @@ class IngestClientItem(BaseModel):
     templates_replies: int = 0
     report_date: Optional[str] = None
 
-# Rutas API
+# Rutas API (Dual Decorator para compatibilidad local y Vercel rewrites)
 @app.get("/api/clients")
+@app.get("/clients")
 def get_clients(seed_demo: bool = False, db: Session = Depends(get_db)):
     clients = crud.get_clients_with_latest_metric(db)
     if not clients and seed_demo:
@@ -58,6 +59,7 @@ def get_clients(seed_demo: bool = False, db: Session = Depends(get_db)):
     return clients
 
 @app.delete("/api/clients/{client_id}")
+@app.delete("/clients/{client_id}")
 def delete_client(client_id: str, db: Session = Depends(get_db)):
     deleted = crud.delete_client(db, client_id)
     if not deleted:
@@ -65,11 +67,13 @@ def delete_client(client_id: str, db: Session = Depends(get_db)):
     return {"status": "deleted", "client_id": client_id}
 
 @app.post("/api/clear-db")
+@app.post("/clear-db")
 def clear_database(db: Session = Depends(get_db)):
     crud.clear_all_data(db)
     return {"status": "cleared", "message": "Base de datos vaciada con éxito. Lista para datos reales."}
 
 @app.post("/api/ingest")
+@app.post("/ingest")
 def ingest_clients(items: List[IngestClientItem], db: Session = Depends(get_db)):
     processed = []
     for item in items:
@@ -80,12 +84,14 @@ def ingest_clients(items: List[IngestClientItem], db: Session = Depends(get_db))
     return {"status": "ok", "ingested_count": len(processed), "client_ids": processed}
 
 @app.post("/api/seed-demo")
+@app.post("/seed-demo")
 def reset_to_demo(db: Session = Depends(get_db)):
     crud.clear_all_data(db)
     crud.seed_demo_data(db)
     return {"status": "demo_loaded", "clients": crud.get_clients_with_latest_metric(db)}
 
 @app.get("/api/export/markdown")
+@app.get("/export/markdown")
 def export_markdown(db: Session = Depends(get_db)):
     clients = crud.get_clients_with_latest_metric(db)
     today = date.today().isoformat()
