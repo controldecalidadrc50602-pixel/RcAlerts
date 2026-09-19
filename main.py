@@ -12,8 +12,11 @@ from backend.database import engine, Base, get_db
 from backend.models import Client
 from backend import crud
 
-# Crear tablas automáticamente al iniciar (SQLite local o Postgres)
-Base.metadata.create_all(bind=engine)
+# Crear tablas automáticamente al iniciar (SQLite local o Postgres Supabase)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    print(f"Non-blocking DB initialization warning: {e}")
 
 app = FastAPI(
     title="OmniPulse Intelligence Hub API",
@@ -118,13 +121,18 @@ def favicon():
     return PlainTextResponse("", status_code=204)
 
 # Servir Frontend
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+BASE_DIR = os.path.dirname(__file__)
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+PUBLIC_DIR = os.path.join(BASE_DIR, "public")
+
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
 def serve_index():
-    index_file = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
+    for folder in [STATIC_DIR, PUBLIC_DIR]:
+        index_file = os.path.join(folder, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
     return {"message": "OmniPulse Backend Running. Static index.html not found."}
+

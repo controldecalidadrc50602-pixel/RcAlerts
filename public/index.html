@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OmniPulse | Intelligence Hub & Client Monitor</title>
+  
+  <!-- Dependencias seguras de terceros -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-light: #eef2ff;
+      --danger: #e11d48;
+      --danger-bg: #ffe4e6;
+      --warning: #d97706;
+      --warning-bg: #fef3c7;
+      --success: #10b981;
+      --success-bg: #d1fae5;
+      --accent: #8b5cf6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding-bottom: 60px;
+    }
+
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      gap: 12px;
+    }
+    .brand-box { display: flex; align-items: center; gap: 12px; }
+    .brand-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: linear-gradient(135deg, #4f46e5, #9333ea);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 20px; font-weight: bold;
+    }
+    .brand-title { font-size: 17px; font-weight: 800; color: var(--text-main); }
+    .brand-sub { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+    .db-status-pill {
+      font-size: 10px; padding: 2px 8px; border-radius: 12px; background: #dcfce7; color: #166534; font-weight: 700;
+    }
+
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .btn {
+      padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1px solid transparent; transition: all 0.2s ease;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-default { background: #f1f5f9; color: #334155; border-color: var(--border); }
+    .btn-default:hover { background: #e2e8f0; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-danger-outline { background: transparent; color: var(--danger); border-color: #fecdd3; }
+    .btn-danger-outline:hover { background: var(--danger-bg); }
+
+    main { max-width: 1280px; margin: 24px auto; padding: 0 16px; display: flex; flex-direction: column; gap: 24px; }
+
+    .tab-navigation {
+      display: flex; gap: 8px; border-bottom: 2px solid var(--border); padding-bottom: 2px;
+    }
+    .tab-btn {
+      background: transparent; border: none; padding: 10px 18px; font-size: 13px; font-weight: 700;
+      color: var(--text-muted); cursor: pointer; border-radius: 8px 8px 0 0; position: relative;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { color: var(--primary); background: #f1f5f9; }
+    .tab-btn.active { color: var(--primary); background: var(--card-bg); }
+    .tab-btn.active::after {
+      content: ''; position: absolute; bottom: -4px; left: 0; right: 0; height: 3px; background: var(--primary);
+    }
+
+    .top-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    @media (max-width: 900px) { .top-grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+
+    .drop-box {
+      border: 2px dashed #cbd5e1; border-radius: 12px; background: #faf5ff;
+      padding: 24px; text-align: center; cursor: pointer; position: relative;
+      transition: all 0.2s ease; margin-top: 12px;
+    }
+    .drop-box.dragover { border-color: var(--primary); background: var(--primary-light); }
+    .drop-box input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+    .benchmark-card {
+      background: linear-gradient(145deg, #0f172a, #1e1b4b); color: #fff;
+      border-radius: 14px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .bench-list { list-style: none; margin-top: 12px; font-size: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .bench-list li { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 4px; }
+    .bench-value { font-weight: 700; font-family: monospace; }
+
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    .kpi-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .kpi-title { font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); }
+    .kpi-num { font-size: 24px; font-weight: 800; color: var(--text-main); margin-top: 4px; font-family: monospace; }
+    .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    .search-input {
+      padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px;
+      outline: none; width: 220px; transition: border-color 0.2s;
+    }
+    .search-input:focus { border-color: var(--primary); }
+
+    .filter-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .filter-btn {
+      background: transparent; border: 1px solid var(--border); padding: 6px 12px;
+      border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text-muted);
+      transition: all 0.2s;
+    }
+    .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    .clients-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+    .client-card {
+      background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px;
+      padding: 18px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+      display: flex; flex-direction: column; justify-content: space-between; position: relative;
+    }
+    .client-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.06); }
+
+    .badge {
+      font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .badge-red { background: var(--danger-bg); color: var(--danger); }
+    .badge-yellow { background: var(--warning-bg); color: var(--warning); }
+    .badge-green { background: var(--success-bg); color: var(--success); }
+
+    .metrics-mini-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0;
+      padding: 10px 0; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; font-size: 12px;
+    }
+
+    .table-container {
+      overflow-x: auto; background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px;
+      max-height: 600px; overflow-y: auto;
+    }
+    table.data-table {
+      width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;
+    }
+    table.data-table th {
+      background: #f8fafc; color: var(--text-muted); font-weight: 700; text-transform: uppercase;
+      font-size: 11px; padding: 12px 14px; border-bottom: 1px solid var(--border); white-space: nowrap;
+      position: sticky; top: 0; z-index: 5;
+    }
+    table.data-table td {
+      padding: 12px 14px; border-bottom: 1px solid #f1f5f9; vertical-align: middle;
+    }
+    table.data-table tr:hover { background: #faf5ff; }
+
+    .diff-badge {
+      font-weight: 700; font-family: monospace; display: inline-flex; align-items: center; gap: 2px;
+    }
+    .diff-pos { color: var(--success); }
+    .diff-neg { color: var(--danger); }
+
+    .vertical-bar {
+      display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: #e2e8f0; width: 100%; min-width: 100px;
+    }
+    .bar-bot { background: #a855f7; }
+    .bar-agent { background: #10b981; }
+    .bar-user { background: #6366f1; }
+
+    /* MODALES */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px;
+    }
+    .modal-content {
+      background: #fff; border-radius: 16px; width: 100%; max-width: 820px;
+      max-height: 90vh; overflow-y: auto; padding: 24px; position: relative; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+    }
+    .close-btn { position: absolute; top: 16px; right: 16px; font-size: 20px; border: none; background: transparent; cursor: pointer; color: var(--text-muted); }
+
+    .modal-form-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0;
+    }
+    @media (max-width: 600px) { .modal-form-grid { grid-template-columns: 1fr; } }
+
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
+    .form-input {
+      padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; outline: none;
+    }
+    .form-input:focus { border-color: var(--primary); }
+
+    .summary-box {
+      background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 10px;
+    }
+
+    .modal-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+    @media (max-width: 650px) { .modal-charts-grid { grid-template-columns: 1fr; } }
+
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; background: #0f172a; color: #fff;
+      padding: 12px 20px; border-radius: 8px; font-size: 12px; font-weight: 600;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); z-index: 100; transition: opacity 0.3s;
+    }
+
+    .empty-state {
+      text-align: center; padding: 48px 24px; background: var(--card-bg); border-radius: 14px;
+      border: 2px dashed var(--border); margin: 20px 0;
+    }
+
+    .btn-delete-card {
+      position: absolute; top: 14px; right: 14px; background: transparent; border: none;
+      color: #cbd5e1; cursor: pointer; font-size: 14px; padding: 4px; border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .btn-delete-card:hover { color: var(--danger); background: var(--danger-bg); }
+
+    .hidden { display: none !important; }
+
+    @media print {
+      header, .drop-box, .filter-bar, .no-print, .tab-navigation { display: none !important; }
+      body { background: #fff; }
+      .card, .client-card { border: 1px solid #ccc; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand-box">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <div class="brand-title">OmniPulse Intelligence Hub</div>
+        <div class="brand-sub">
+          <span>Monitor Multicanal & Analytics</span>
+          <span class="db-status-pill" id="db-status-badge">💾 Base de Datos Activa</span>
+        </div>
+      </div>
+    </div>
+    <div class="btn-group no-print">
+      <button id="btn-clear-db" class="btn btn-danger-outline" title="Vaciar base de datos para comenzar en blanco">🗑️ Limpiar Cartera</button>
+      <button id="btn-load-demo" class="btn btn-default">✨ Cargar 5 Clientes Demo</button>
+      <button id="btn-export-md" class="btn btn-primary">📄 Exportar NotebookLM (.MD)</button>
+      <button id="btn-print" class="btn btn-default">🖨️ Imprimir / PDF</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Navegación de Pestañas Analíticas -->
+    <div class="tab-navigation no-print">
+      <button class="tab-btn active" data-tab="tab-fichas">📊 Fichas & KPIs de Cartera</button>
+      <button class="tab-btn" data-tab="tab-matriz">📈 Análisis Vertical y Horizontal</button>
+      <button class="tab-btn" data-tab="tab-graficas">📉 Gráficas de Tendencia & Cuadrantes</button>
+    </div>
+
+    <!-- PESTAÑA 1: FICHAS & INGESTA -->
+    <div id="tab-fichas" class="tab-content">
+      <div class="top-grid no-print">
+        <div class="card">
+          <h3 style="font-size: 15px; font-weight: 700;">📥 Ingesta de Archivos por Cliente (CSV o TSV)</h3>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+            Arrastra el archivo de sesiones de un cliente (ej. export de Botmaker o WhatsApp). Se abrirá una ventana para confirmar el <strong>Nombre del Cliente</strong>, la <strong>Fecha</strong> y métricas de plantillas antes de guardarlo.
+          </p>
+          
+          <div class="drop-box" id="drop-zone">
+            <input type="file" id="file-input" accept=".csv,.tsv,.txt">
+            <div style="font-size: 26px; margin-bottom: 4px;">📂</div>
+            <p style="font-size: 13px; font-weight: 600; color: var(--text-main);">
+              Arrastra aquí el archivo <span style="color: var(--primary);">.TSV</span> o <span style="color: var(--primary);">.CSV</span> del cliente
+            </p>
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Totaliza automáticamente sesiones y mensajes de la cuenta</p>
+          </div>
+        </div>
+
+        <div class="benchmark-card">
+          <div>
+            <span style="font-size: 10px; font-weight: 800; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 12px; text-transform: uppercase;">Benchmark Cuantitativo</span>
+            <h4 style="font-size: 14px; margin-top: 6px;">Estándares de la Industria</h4>
+            <ul class="bench-list">
+              <li><span>Automatización Bot:</span><span class="bench-value" style="color: #34d399;">55% - 75%</span></li>
+              <li><span>Entrega Plantillas:</span><span class="bench-value" style="color: #34d399;">&gt; 85%</span></li>
+              <li><span>Respuesta Plantillas:</span><span class="bench-value" style="color: #fbbf24;">6% - 15%</span></li>
+              <li><span>Riesgo Crítico (Churn):</span><span class="bench-value" style="color: #f87171;">&lt; 3% resp. o WoW &le; -20%</span></li>
+            </ul>
+          </div>
+          <p style="font-size: 10px; opacity: 0.7; margin-top: 10px;">Base estructurada para razonamiento en NotebookLM.</p>
+        </div>
+      </div>
+
+      <!-- KPIs Globales -->
+      <div style="margin-top: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <h2 style="font-size: 17px; font-weight: 800;">Panel Consolidado de la Cartera</h2>
+            <p style="font-size: 12px; color: var(--text-muted);">Métricas agregadas acumuladas de todos los clientes</p>
+          </div>
+          <div class="filter-bar no-print">
+            <input type="text" id="client-search" class="search-input" placeholder="🔍 Buscar cliente en cartera...">
+            <button class="filter-btn active" data-filter="all">Todos (<span id="count-all">0</span>)</button>
+            <button class="filter-btn" data-filter="red" style="color: var(--danger);">🔴 Riesgo (<span id="count-red">0</span>)</button>
+            <button class="filter-btn" data-filter="yellow" style="color: var(--warning);">🟡 Precaución (<span id="count-yellow">0</span>)</button>
+            <button class="filter-btn" data-filter="green" style="color: var(--success);">🟢 Saludable (<span id="count-green">0</span>)</button>
+          </div>
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi-card">
+            <div class="kpi-title">Sesiones Totales Cartera</div>
+            <div class="kpi-num" id="kpi-sessions">0</div>
+            <div class="kpi-sub" id="kpi-sessions-wow">WoW: --</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Mensajes Totales Cartera</div>
+            <div class="kpi-num" id="kpi-messages">0</div>
+            <div class="kpi-sub">Usuarios + Bot + Agentes</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Automatización Media</div>
+            <div class="kpi-num" id="kpi-automation" style="color: var(--primary);">0%</div>
+            <div class="kpi-sub">Resolución Bot</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Efectividad Plantillas</div>
+            <div class="kpi-num" id="kpi-templates-rate">0%</div>
+            <div class="kpi-sub">Tasa media de respuesta</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fichas de Clientes -->
+      <div style="margin-top: 24px;">
+        <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 12px;">Clientes Monitoreados en Cartera</h3>
+        <div id="empty-state" class="empty-state hidden">
+          <div style="font-size: 40px; margin-bottom: 8px;">📂</div>
+          <h4 style="font-size: 15px; font-weight: 700;">No hay clientes en la cartera todavía</h4>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+            Arrastra el archivo TSV o CSV de tu primer cliente en el recuadro superior para consolidarlo.
+          </p>
+        </div>
+        <div class="clients-grid" id="clients-grid"></div>
+      </div>
+    </div>
+
+    <!-- PESTAÑA 2: MATRIZ DE ANÁLISIS VERTICAL Y HORIZONTAL -->
+    <div id="tab-matriz" class="tab-content hidden">
+      <div class="card" style="margin-bottom: 20px;">
+        <h3 style="font-size: 16px; font-weight: 800; color: var(--text-main);">📐 Matriz de Análisis Financiero & Operativo</h3>
+        <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+          <strong>Análisis Horizontal:</strong> Variación temporal WoW en valor absoluto (&Delta; Neta) y porcentaje (%&Delta;).<br>
+          <strong>Análisis Vertical:</strong> Estructura de interacción interna (% Bot vs % Agente) y peso relativo del cliente en la cartera global (% Cartera).
+        </p>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table" id="matrix-table">
+          <thead>
+            <tr>
+              <th>Cliente / ID</th>
+              <th>Sesiones Actuales</th>
+              <th>Sesiones Previas</th>
+              <th>Variación Absoluta (&Delta;)</th>
+              <th>Variación % (&Delta; WoW)</th>
+              <th>Mix Mensajes (Análisis Vertical Cuenta)</th>
+              <th>% Cartera Global</th>
+              <th>Resp. Plantilla</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="matrix-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PESTAÑA 3: GRÁFICAS DE TENDENCIA & CUADRANTES -->
+    <div id="tab-graficas" class="tab-content hidden">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="card">
+          <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">Cuentas: Usuarios vs. Bot vs. Agentes</h3>
+          <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">Carga de trabajo por cliente</p>
+          <div style="height: 320px; position: relative;">
+            <canvas id="globalChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">Matriz Cuadrante: Automatización vs. Conversión</h3>
+          <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">Eficiencia del Bot (%) vs. Respuesta a Plantillas Outbound (%)</p>
+          <div style="height: 320px; position: relative;">
+            <canvas id="scatterQuadrantChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 1: VENTANA DE ASIGNACIÓN / INGESTA POR CLIENTE -->
+    <div id="ingest-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+      <div class="modal-content" style="max-width: 650px;">
+        <button class="close-btn" id="close-ingest-modal-btn" aria-label="Cerrar">✕</button>
+        
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="font-size: 24px;">📥</div>
+          <div>
+            <h2 style="font-size: 18px; font-weight: 800;">Consolidar Archivo de Cliente</h2>
+            <p style="font-size: 12px; color: var(--text-muted);">Confirma el nombre de la cuenta y el período antes de guardarlo en la cartera</p>
+          </div>
+        </div>
+
+        <form id="ingest-form" onsubmit="return false;">
+          <div class="modal-form-grid">
+            <div class="form-group" style="grid-column: span 2;">
+              <label class="form-label">Nombre del Cliente / Empresa *</label>
+              <input type="text" id="inp-client-name" class="form-input" required placeholder="Ej. Asesores Mena, Clínica Sonrisas...">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">ID / Código de Cuenta</label>
+              <input type="text" id="inp-client-id" class="form-input" placeholder="Ej. CLI-MENA">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Fecha de Corte / Período *</label>
+              <input type="date" id="inp-client-date" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Giro / Industria</label>
+              <input type="text" id="inp-client-industry" class="form-input" placeholder="Ej. Seguros, Salud, Retail...">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Sitio Web / Enlace</label>
+              <input type="text" id="inp-client-website" class="form-input" placeholder="https://cliente.com">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Sesiones Previas (Semana anterior WoW)</label>
+              <input type="number" id="inp-client-prev-sessions" class="form-input" placeholder="0">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Enfoque Operativo</label>
+              <input type="text" id="inp-client-focus" class="form-input" placeholder="Ej. Atención y agendamiento 24/7">
+            </div>
+          </div>
+
+          <!-- SECCIÓN PLANTILLAS OUTBOUND -->
+          <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 10px; padding: 12px; margin-top: 6px;">
+            <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #6b21a8; margin-bottom: 8px;">Métricas Outbound de Plantillas WhatsApp (Opcional)</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+              <div class="form-group">
+                <label class="form-label" style="font-size: 10px;">Enviadas</label>
+                <input type="number" id="inp-client-templates-sent" class="form-input" value="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size: 10px;">Entregadas</label>
+                <input type="number" id="inp-client-templates-delivered" class="form-input" value="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size: 10px;">Respuestas</label>
+                <input type="number" id="inp-client-templates-replies" class="form-input" value="0">
+              </div>
+            </div>
+          </div>
+
+          <!-- RESUMEN CALCULADO DEL ARCHIVO -->
+          <div class="summary-box">
+            <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">Totales Calculados desde el Archivo:</h4>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;">
+              <div>
+                <span style="font-size: 10px; color: var(--text-muted); display: block;">Sesiones</span>
+                <strong id="sum-sessions" style="font-size: 16px; font-family: monospace;">0</strong>
+              </div>
+              <div>
+                <span style="font-size: 10px; color: var(--text-muted); display: block;">Msgs Usuario</span>
+                <strong id="sum-user-msgs" style="font-size: 16px; font-family: monospace; color: #6366f1;">0</strong>
+              </div>
+              <div>
+                <span style="font-size: 10px; color: var(--text-muted); display: block;">Msgs Bot</span>
+                <strong id="sum-bot-msgs" style="font-size: 16px; font-family: monospace; color: #a855f7;">0</strong>
+              </div>
+              <div>
+                <span style="font-size: 10px; color: var(--text-muted); display: block;">Msgs Agente</span>
+                <strong id="sum-agent-msgs" style="font-size: 16px; font-family: monospace; color: #10b981;">0</strong>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px;">
+            <button type="button" id="btn-cancel-ingest" class="btn btn-default">Cancelar</button>
+            <button type="button" id="btn-save-ingest" class="btn btn-primary">💾 Guardar y Consolidar en la Cartera</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL 2: DETALLE Y DIAGNÓSTICO INDIVIDUAL CLIENTE -->
+    <div id="client-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+      <div class="modal-content">
+        <button class="close-btn" id="close-modal-btn" aria-label="Cerrar">✕</button>
+        
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span id="modal-status-badge" class="badge"></span>
+            <h2 id="modal-client-name" style="font-size: 18px; font-weight: 800;"></h2>
+          </div>
+          <p id="modal-client-meta" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;"></p>
+        </div>
+
+        <div class="modal-charts-grid">
+          <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 12px;">
+            <h4 style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Distribución de Mensajes</h4>
+            <div style="height: 180px; position: relative;">
+              <canvas id="clientDoughnutChart"></canvas>
+            </div>
+          </div>
+
+          <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 12px;">
+            <h4 style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Funnel de Plantillas Outbound</h4>
+            <div style="height: 180px; position: relative;">
+              <canvas id="clientTemplatesBarChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div style="background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 10px; padding: 14px;">
+          <h4 style="font-size: 12px; font-weight: 800; color: #3730a3;">🧠 Diagnóstico del Algoritmo:</h4>
+          <div id="modal-diagnostic-text" style="font-size: 12px; color: #1e1b4b; margin-top: 6px; line-height: 1.5;"></div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+          <button id="btn-delete-modal-client" class="btn btn-danger-outline">🗑️ Eliminar este Cliente de la Cartera</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script>
+    'use strict';
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      if (!t) return;
+      t.textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 3500);
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+    }
+
+    function sanitizeUrl(url) {
+      if (!url || typeof url !== 'string') return '#';
+      const clean = url.trim();
+      return /^(https?:\/\/)/i.test(clean) ? clean : '#';
+    }
+
+    let clientsData = [];
+    let globalChartInstance = null;
+    let scatterQuadrantInstance = null;
+    let modalDoughnutInstance = null;
+    let modalBarInstance = null;
+    let currentFilter = 'all';
+    let searchQuery = '';
+    let selectedClientForModal = null;
+
+    // Buffer temporal para el archivo en proceso de asignación
+    let pendingClientData = null;
+
+    // Pestañas
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+        btn.classList.add('active');
+        const target = document.getElementById(btn.dataset.tab);
+        if (target) {
+          target.classList.remove('hidden');
+          if (btn.dataset.tab === 'tab-graficas') updateCharts();
+        }
+      };
+    });
+
+    async function fetchClients() {
+      try {
+        const res = await fetch('/api/clients');
+        if (res.ok) {
+          clientsData = await res.json();
+          renderAll();
+        }
+      } catch (err) {
+        console.warn("Error cargando clientes:", err);
+      }
+    }
+
+    function renderAll() {
+      renderDashboard();
+      renderMatrix();
+      updateCharts();
+    }
+
+    function getFilteredClients() {
+      return (clientsData || []).filter(c => {
+        if (!c) return false;
+        const matchesFilter = (currentFilter === 'all' || c.status === currentFilter);
+        const nameStr = (c.name || '').toLowerCase();
+        const idStr = (c.id || '').toLowerCase();
+        const matchesSearch = !searchQuery || nameStr.includes(searchQuery) || idStr.includes(searchQuery);
+        return matchesFilter && matchesSearch;
+      });
+    }
+
+    function renderDashboard() {
+      const grid = document.getElementById('clients-grid');
+      const emptyState = document.getElementById('empty-state');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      if (!clientsData || !clientsData.length) {
+        emptyState?.classList.remove('hidden');
+      } else {
+        emptyState?.classList.add('hidden');
+      }
+
+      let totalSessions = 0, totalPrevSessions = 0, totalMsgs = 0, sumAutoRatio = 0, totalDelivered = 0, totalReplies = 0;
+      const counts = { all: clientsData.length, red: 0, yellow: 0, green: 0 };
+
+      clientsData.forEach(c => {
+        if (c && c.status) {
+          counts[c.status] = (counts[c.status] || 0) + 1;
+        }
+        totalSessions += Number(c.sessions || 0);
+        totalPrevSessions += Number(c.prev_sessions || c.sessions || 0);
+        totalMsgs += Number((c.user_msgs || 0) + (c.bot_msgs || 0) + (c.agent_msgs || 0));
+        sumAutoRatio += Number(c.auto_ratio || 0);
+        totalDelivered += Number(c.templates_delivered || 0);
+        totalReplies += Number(c.templates_replies || 0);
+      });
+
+      document.getElementById('count-all').textContent = counts.all;
+      document.getElementById('count-red').textContent = counts.red || 0;
+      document.getElementById('count-yellow').textContent = counts.yellow || 0;
+      document.getElementById('count-green').textContent = counts.green || 0;
+
+      const filtered = getFilteredClients();
+
+      filtered.forEach(c => {
+        const badgeClass = c.status === 'red' ? 'badge-red' : (c.status === 'yellow' ? 'badge-yellow' : 'badge-green');
+        const badgeLabel = c.status === 'red' ? '🔴 Riesgo Churn' : (c.status === 'yellow' ? '🟡 Precaución' : '🟢 Saludable');
+        const safeUrl = sanitizeUrl(c.website);
+        const displayUrl = escapeHtml((c.website || '').replace(/^https?:\/\//i, ''));
+        const deltaPct = Number(c.delta_sessions_pct || 0);
+        const deltaAbs = Number(c.delta_sessions_abs || 0);
+
+        const card = document.createElement('div');
+        card.className = 'client-card';
+        card.onclick = () => openClientModal(c);
+
+        card.innerHTML = `
+          <button class="btn-delete-card" title="Eliminar cliente" onclick="event.stopPropagation(); deleteClientById('${c.id}', '${escapeHtml(c.name)}')">✕</button>
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-right: 20px;">
+              <div>
+                <span style="font-size: 10px; color: var(--text-muted); font-family: monospace;">${escapeHtml(c.id || '')}</span>
+                <h4 style="font-size: 15px; font-weight: 800;">${escapeHtml(c.name || 'Sin Nombre')}</h4>
+                <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="font-size: 11px; color: var(--primary); text-decoration: none;">
+                  ${displayUrl || 'Ver web'} ↗
+                </a>
+              </div>
+              <span class="badge ${badgeClass}">${badgeLabel}</span>
+            </div>
+
+            <div class="metrics-mini-grid">
+              <div>
+                <span style="color: var(--text-muted); font-size: 10px; display: block;">Sesiones</span>
+                <span style="font-weight: 700; font-family: monospace;">${Number(c.sessions || 0).toLocaleString()}</span>
+                <span style="font-size: 10px; color: ${deltaPct >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                  ${deltaPct >= 0 ? '+' : ''}${deltaPct}% (${deltaAbs >= 0 ? '+' : ''}${deltaAbs.toLocaleString()})
+                </span>
+              </div>
+              <div>
+                <span style="color: var(--text-muted); font-size: 10px; display: block;">Automatización</span>
+                <span style="font-weight: 700; font-family: monospace;">${Number(c.auto_ratio || 0).toFixed(0)}%</span>
+                <span style="font-size: 10px; color: var(--text-muted);">Bot (${Number(c.share_bot || 0).toFixed(0)}%)</span>
+              </div>
+              <div>
+                <span style="color: var(--text-muted); font-size: 10px; display: block;">Plantillas Enviadas</span>
+                <span style="font-weight: 700; font-family: monospace;">${Number(c.templates_sent || 0).toLocaleString()}</span>
+              </div>
+              <div>
+                <span style="color: var(--text-muted); font-size: 10px; display: block;">Resp. Plantilla</span>
+                <span style="font-weight: 700; font-family: monospace; color: ${Number(c.reply_rate || 0) < 4 ? 'var(--danger)' : 'inherit'};">
+                  ${Number(c.reply_rate || 0).toFixed(1)}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
+            <span style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📍 ${escapeHtml(c.industry || 'General')} • ${Number(c.portfolio_share_sessions || 0).toFixed(1)}% cartera</span>
+            <span style="font-weight: 700; color: var(--primary);">Ver Detalle →</span>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      document.getElementById('kpi-sessions').textContent = totalSessions.toLocaleString();
+      const wowTotal = totalPrevSessions > 0 ? ((totalSessions - totalPrevSessions) / totalPrevSessions * 100) : 0;
+      const wowAbs = totalSessions - totalPrevSessions;
+      const kpiWowEl = document.getElementById('kpi-sessions-wow');
+      if (kpiWowEl) {
+        kpiWowEl.textContent = `WoW: ${wowTotal >= 0 ? '+' : ''}${wowTotal.toFixed(1)}% (${wowAbs >= 0 ? '+' : ''}${wowAbs.toLocaleString()})`;
+        kpiWowEl.style.color = wowTotal >= 0 ? 'var(--success)' : 'var(--danger)';
+      }
+
+      document.getElementById('kpi-messages').textContent = totalMsgs.toLocaleString();
+      document.getElementById('kpi-automation').textContent = clientsData.length ? `${(sumAutoRatio / clientsData.length).toFixed(0)}%` : '0%';
+      document.getElementById('kpi-templates-rate').textContent = totalDelivered > 0 ? `${((totalReplies / totalDelivered) * 100).toFixed(1)}%` : '0%';
+    }
+
+    function renderMatrix() {
+      const tbody = document.getElementById('matrix-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const filtered = getFilteredClients();
+
+      if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 24px; color: var(--text-muted);">Sin datos en la cartera. Arrastra el archivo de un cliente arriba.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(c => {
+        const tr = document.createElement('tr');
+        const deltaAbs = Number(c.delta_sessions_abs || 0);
+        const deltaPct = Number(c.delta_sessions_pct || 0);
+        const diffClass = deltaAbs >= 0 ? 'diff-pos' : 'diff-neg';
+        const badgeClass = c.status === 'red' ? 'badge-red' : (c.status === 'yellow' ? 'badge-yellow' : 'badge-green');
+        const badgeLabel = c.status === 'red' ? '🔴 Riesgo' : (c.status === 'yellow' ? '🟡 Precaución' : '🟢 Saludable');
+
+        tr.innerHTML = `
+          <td>
+            <strong>${escapeHtml(c.name || 'Sin Nombre')}</strong><br>
+            <span style="font-size: 10px; color: var(--text-muted); font-family: monospace;">${escapeHtml(c.id || '')}</span>
+          </td>
+          <td style="font-family: monospace; font-weight: 700;">${Number(c.sessions || 0).toLocaleString()}</td>
+          <td style="font-family: monospace; color: var(--text-muted);">${Number(c.prev_sessions || 0).toLocaleString()}</td>
+          <td>
+            <span class="diff-badge ${diffClass}">
+              ${deltaAbs >= 0 ? '+' : ''}${deltaAbs.toLocaleString()}
+            </span>
+          </td>
+          <td>
+            <span class="diff-badge ${diffClass}">
+              ${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%
+            </span>
+          </td>
+          <td style="min-width: 140px;">
+            <div class="vertical-bar" title="Bot: ${Number(c.share_bot || 0).toFixed(1)}% | Agentes: ${Number(c.share_agent || 0).toFixed(1)}% | Usuario: ${Number(c.share_user || 0).toFixed(1)}%">
+              <div class="bar-bot" style="width: ${Number(c.share_bot || 0)}%"></div>
+              <div class="bar-agent" style="width: ${Number(c.share_agent || 0)}%"></div>
+              <div class="bar-user" style="width: ${Number(c.share_user || 0)}%"></div>
+            </div>
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">
+              Bot: ${Number(c.share_bot || 0).toFixed(0)}% | Humano: ${Number(c.share_agent || 0).toFixed(0)}%
+            </div>
+          </td>
+          <td>
+            <strong style="font-family: monospace;">${Number(c.portfolio_share_sessions || 0).toFixed(1)}%</strong>
+            <div style="font-size: 10px; color: var(--text-muted);">${Number(c.portfolio_share_msgs || 0).toFixed(1)}% msgs</div>
+          </td>
+          <td style="font-family: monospace; font-weight: 700; color: ${Number(c.reply_rate || 0) < 4 ? 'var(--danger)' : 'inherit'};">
+            ${Number(c.reply_rate || 0).toFixed(1)}%
+          </td>
+          <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateCharts() {
+      if (!clientsData || !clientsData.length) return;
+
+      const canvas1 = document.getElementById('globalChart');
+      if (canvas1) {
+        const ctx1 = canvas1.getContext('2d');
+        if (globalChartInstance) globalChartInstance.destroy();
+
+        const labels = clientsData.map(c => {
+          const n = String(c?.name || 'Cliente');
+          return n.length > 14 ? n.slice(0, 14) + '...' : n;
+        });
+
+        globalChartInstance = new Chart(ctx1, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'Msgs Usuario', data: clientsData.map(c => Number(c?.user_msgs || 0)), backgroundColor: '#6366f1' },
+              { label: 'Msgs Bot', data: clientsData.map(c => Number(c?.bot_msgs || 0)), backgroundColor: '#a855f7' },
+              { label: 'Msgs Agente', data: clientsData.map(c => Number(c?.agent_msgs || 0)), backgroundColor: '#10b981' }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+              y: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }
+            },
+            plugins: { legend: { position: 'top', labels: { boxWidth: 8, font: { size: 10 } } } }
+          }
+        });
+      }
+
+      const canvas2 = document.getElementById('scatterQuadrantChart');
+      if (canvas2) {
+        const ctx2 = canvas2.getContext('2d');
+        if (scatterQuadrantInstance) scatterQuadrantInstance.destroy();
+
+        const scatterData = clientsData.map(c => ({
+          x: Number(c?.auto_ratio || 0),
+          y: Number(c?.reply_rate || 0),
+          clientName: String(c?.name || 'Cliente'),
+          status: c?.status || 'green'
+        }));
+
+        scatterQuadrantInstance = new Chart(ctx2, {
+          type: 'scatter',
+          data: {
+            datasets: [{
+              label: 'Cuentas',
+              data: scatterData,
+              pointBackgroundColor: scatterData.map(d => d.status === 'red' ? '#e11d48' : (d.status === 'yellow' ? '#d97706' : '#10b981')),
+              pointRadius: 6,
+              pointHoverRadius: 8
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                title: { display: true, text: 'Automatización Bot (%)', font: { size: 11, weight: 'bold' } },
+                min: 0, max: 100, grid: { color: '#f1f5f9' }
+              },
+              y: {
+                title: { display: true, text: 'Tasa Respuesta Plantillas (%)', font: { size: 11, weight: 'bold' } },
+                min: 0, grid: { color: '#f1f5f9' }
+              }
+            },
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    const raw = ctx?.raw || {};
+                    const name = raw.clientName || 'Cliente';
+                    const xVal = Number(raw.x || 0).toFixed(1);
+                    const yVal = Number(raw.y || 0).toFixed(1);
+                    return `${name}: Bot ${xVal}% | Resp: ${yVal}%`;
+                  }
+                }
+              },
+              legend: { display: false }
+            }
+          }
+        });
+      }
+    }
+
+    // MAPEO INTELIGENTE DE COLUMNAS
+    function normalizeField(row, candidates) {
+      if (!row || typeof row !== 'object') return undefined;
+      const keys = Object.keys(row);
+      for (const cand of candidates) {
+        for (const k of keys) {
+          if (k === null || k === undefined) continue;
+          const cleanK = String(k).toLowerCase().trim().replace(/[-_]/g, ' ');
+          if (cleanK === cand || cleanK.includes(cand)) {
+            return row[k];
+          }
+        }
+      }
+      return undefined;
+    }
+
+    // AL ARRASTRAR O SELECCIONAR UN ARCHIVO (Lectura segura con file.text())
+    async function parseFilePromise(file) {
+      try {
+        const text = await file.text();
+        const results = Papa.parse(text, {
+          header: true,
+          dynamicTyping: true,
+          skipEmptyLines: true,
+          delimitersToGuess: ['\t', ',', ';', '|']
+        });
+        return { file, results };
+      } catch (err) {
+        console.error("Error leyendo archivo:", err);
+        return { file, results: { data: [] } };
+      }
+    }
+
+    async function handleIncomingFile(file) {
+      if (!file) return;
+
+      try {
+        showToast("⏳ Analizando archivo del cliente...");
+        const { results } = await parseFilePromise(file);
+
+        if (!results || !results.data || !results.data.length) {
+          showToast("⚠️ El archivo está vacío o no tiene formato válido");
+          return;
+        }
+
+        const rows = results.data;
+        const cleanFileName = file.name ? file.name.replace(/\.(csv|tsv|txt)$/i, '') : 'Cliente';
+
+        let totalSessions = rows.length;
+        let totalUserMsgs = 0;
+        let totalBotMsgs = 0;
+        let totalAgentMsgs = 0;
+        let detectedDates = [];
+        let detectedChannel = '';
+
+        rows.forEach(r => {
+          if (!r || typeof r !== 'object') return;
+          const u = Number(normalizeField(r, ['mensajes usuario', 'user messages', 'inbound']) || 0);
+          const b = Number(normalizeField(r, ['mensajes bot', 'bot messages', 'bot']) || 0);
+          const a = Number(normalizeField(r, ['mensajes agente', 'agent messages', 'agente']) || 0);
+          totalUserMsgs += u;
+          totalBotMsgs += b;
+          totalAgentMsgs += a;
+
+          const f = normalizeField(r, ['fecha sesion', 'fecha', 'date']);
+          if (f) detectedDates.push(String(f).split('T')[0]);
+
+          if (!detectedChannel) {
+            const ch = normalizeField(r, ['id canal', 'canal', 'channel']);
+            if (ch) detectedChannel = String(ch);
+          }
+        });
+
+        // Extraer nombre sugerido del cliente a partir del canal o nombre de archivo
+        let suggestedName = cleanFileName;
+        if (detectedChannel) {
+          const parts = detectedChannel.split('-');
+          if (parts[0]) {
+            suggestedName = parts[0]
+              .replace(/([A-Z])/g, ' $1')
+              .replace(/^./, str => str.toUpperCase())
+              .trim();
+            if (suggestedName.toLowerCase() === 'asesoresmena') suggestedName = 'Asesores Mena';
+          }
+        }
+
+        // Fecha más reciente detectada o la fecha de hoy
+        detectedDates.sort();
+        const latestDate = detectedDates.length ? detectedDates[detectedDates.length - 1] : new Date().toISOString().split('T')[0];
+
+        // Almacenar en buffer
+        pendingClientData = {
+          suggestedName,
+          fileName: cleanFileName,
+          sessions: totalSessions,
+          userMsgs: totalUserMsgs,
+          botMsgs: totalBotMsgs,
+          agentMsgs: totalAgentMsgs,
+          reportDate: latestDate
+        };
+
+        // Rellenar formulario del modal
+        const nameEl = document.getElementById('inp-client-name');
+        if (nameEl) nameEl.value = suggestedName;
+
+        const idEl = document.getElementById('inp-client-id');
+        if (idEl) idEl.value = `CLI-${suggestedName.toUpperCase().replace(/[^A-Z0-9]/g, '-').slice(0, 10)}`;
+
+        const dateEl = document.getElementById('inp-client-date');
+        if (dateEl) dateEl.value = latestDate;
+
+        const prevSessEl = document.getElementById('inp-client-prev-sessions');
+        if (prevSessEl) prevSessEl.value = totalSessions;
+
+        document.getElementById('sum-sessions').textContent = totalSessions.toLocaleString();
+        document.getElementById('sum-user-msgs').textContent = totalUserMsgs.toLocaleString();
+        document.getElementById('sum-bot-msgs').textContent = totalBotMsgs.toLocaleString();
+        document.getElementById('sum-agent-msgs').textContent = totalAgentMsgs.toLocaleString();
+
+        document.getElementById('ingest-modal')?.classList.remove('hidden');
+      } catch (err) {
+        console.error("Error en handleIncomingFile:", err);
+        showToast("❌ Error al procesar el archivo");
+      }
+    }
+
+    // BOTÓN GUARDAR MODAL INGESTA
+    document.getElementById('btn-save-ingest').onclick = async () => {
+      if (!pendingClientData) {
+        showToast("⚠️ No hay datos cargados para guardar");
+        return;
+      }
+
+      const name = (document.getElementById('inp-client-name')?.value || '').trim();
+      const dateVal = document.getElementById('inp-client-date')?.value || '';
+
+      if (!name) {
+        alert("Por favor ingresa el nombre del cliente.");
+        return;
+      }
+      if (!dateVal) {
+        alert("Por favor selecciona la fecha del período.");
+        return;
+      }
+
+      const clientPayload = {
+        id: (document.getElementById('inp-client-id')?.value || '').trim() || `CLI-${Math.floor(100 + Math.random() * 900)}`,
+        name: name,
+        website: (document.getElementById('inp-client-website')?.value || '').trim() || "https://sin-web.com",
+        industry: (document.getElementById('inp-client-industry')?.value || '').trim() || "General",
+        focus: (document.getElementById('inp-client-focus')?.value || '').trim() || "Atención multicanal",
+        sessions: Number(pendingClientData.sessions || 0),
+        prev_sessions: Number(document.getElementById('inp-client-prev-sessions')?.value || pendingClientData.sessions),
+        user_msgs: Number(pendingClientData.userMsgs || 0),
+        bot_msgs: Number(pendingClientData.botMsgs || 0),
+        agent_msgs: Number(pendingClientData.agentMsgs || 0),
+        templates_sent: Number(document.getElementById('inp-client-templates-sent')?.value || 0),
+        templates_delivered: Number(document.getElementById('inp-client-templates-delivered')?.value || 0),
+        templates_replies: Number(document.getElementById('inp-client-templates-replies')?.value || 0),
+        report_date: dateVal
+      };
+
+      try {
+        const res = await fetch('/api/ingest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify([clientPayload])
+        });
+
+        if (res.ok) {
+          showToast(`✅ Cliente "${name}" guardado exitosamente en la cartera`);
+          document.getElementById('ingest-modal')?.classList.add('hidden');
+          pendingClientData = null;
+          await fetchClients();
+        } else {
+          showToast("❌ Error al guardar en base de datos");
+        }
+      } catch (err) {
+        console.error(err);
+        showToast("⚠️ Error de conexión con el backend");
+      }
+    };
+
+    document.getElementById('btn-cancel-ingest').onclick = () => {
+      document.getElementById('ingest-modal')?.classList.add('hidden');
+      pendingClientData = null;
+    };
+    document.getElementById('close-ingest-modal-btn').onclick = () => {
+      document.getElementById('ingest-modal')?.classList.add('hidden');
+      pendingClientData = null;
+    };
+
+    // ELIMINAR UN CLIENTE
+    async function deleteClientById(clientId, clientName) {
+      if (confirm(`¿Deseas eliminar a "${clientName}" de la cartera?`)) {
+        try {
+          const res = await fetch(`/api/clients/${clientId}`, { method: 'DELETE' });
+          if (res.ok) {
+            showToast(`🗑️ Cliente "${clientName}" eliminado`);
+            await fetchClients();
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+
+    // Prevenir que el navegador intente abrir el archivo si se suelta fuera del dropzone
+    window.addEventListener('dragover', (e) => e.preventDefault(), false);
+    window.addEventListener('drop', (e) => e.preventDefault(), false);
+
+    // File input & Drag & Drop
+    const fileInput = document.getElementById('file-input');
+    fileInput.addEventListener('change', async function(e) {
+      if (e.target.files && e.target.files.length > 0) {
+        await handleIncomingFile(e.target.files[0]);
+      }
+      e.target.value = '';
+    });
+
+    const dropZone = document.getElementById('drop-zone');
+    ['dragenter', 'dragover'].forEach(name => {
+      dropZone.addEventListener(name, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('dragover');
+      }, false);
+    });
+    ['dragleave'].forEach(name => {
+      dropZone.addEventListener(name, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('dragover');
+      }, false);
+    });
+    dropZone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        await handleIncomingFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    // MODAL DETALLE
+    function openClientModal(client) {
+      if (!client) return;
+      selectedClientForModal = client;
+
+      document.getElementById('modal-client-name').textContent = client.name || 'Sin Nombre';
+      document.getElementById('modal-client-meta').textContent = `${client.industry || 'General'} • Web: ${client.website || 'sin-web.com'} • Período: ${client.report_date || 'Reciente'}`;
+
+      const badge = document.getElementById('modal-status-badge');
+      if (badge) {
+        badge.textContent = client.status === 'red' ? '🔴 Riesgo Crítico Churn' : (client.status === 'yellow' ? '🟡 Precaución Operativa' : '🟢 Operación Saludable');
+        badge.className = `badge ${client.status === 'red' ? 'badge-red' : (client.status === 'yellow' ? 'badge-yellow' : 'badge-green')}`;
+      }
+
+      const deltaPct = Number(client.delta_sessions_pct || 0);
+      const deltaAbs = Number(client.delta_sessions_abs || 0);
+      const issues = Array.isArray(client.issues) ? client.issues : ['Actividad saludable'];
+
+      const diagContainer = document.getElementById('modal-diagnostic-text');
+      if (diagContainer) {
+        diagContainer.innerHTML = `
+          <strong>Alertas del algoritmo:</strong><br>
+          ${issues.map(i => `• ${escapeHtml(i)}`).join('<br>')}<br><br>
+          <strong>Métricas Estructuradas de la Cuenta:</strong><br>
+          • Variación Sesiones WoW: <strong>${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%</strong> (${deltaAbs >= 0 ? '+' : ''}${deltaAbs.toLocaleString()} netas)<br>
+          • Participación en Cartera: <strong>${Number(client.portfolio_share_sessions || 0).toFixed(1)}%</strong> del tráfico global.<br>
+          • Automatización Bot: <strong>${Number(client.auto_ratio || 0).toFixed(1)}%</strong> (Mix: Bot ${Number(client.share_bot || 0).toFixed(0)}% | Humano ${Number(client.share_agent || 0).toFixed(0)}%).<br>
+          • Tasa de respuesta a plantillas: <strong>${Number(client.reply_rate || 0).toFixed(1)}%</strong> (Estándar de mercado: 6% - 15%).
+        `;
+      }
+
+      // Doughnut
+      const ctxD = document.getElementById('clientDoughnutChart')?.getContext('2d');
+      if (ctxD) {
+        if (modalDoughnutInstance) modalDoughnutInstance.destroy();
+        modalDoughnutInstance = new Chart(ctxD, {
+          type: 'doughnut',
+          data: {
+            labels: ['Bot', 'Agentes', 'Usuarios'],
+            datasets: [{
+              data: [Number(client.bot_msgs || 0), Number(client.agent_msgs || 0), Number(client.user_msgs || 0)],
+              backgroundColor: ['#a855f7', '#10b981', '#6366f1']
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, font: { size: 10 } } } } }
+        });
+      }
+
+      // Bar
+      const ctxB = document.getElementById('clientTemplatesBarChart')?.getContext('2d');
+      if (ctxB) {
+        if (modalBarInstance) modalBarInstance.destroy();
+        modalBarInstance = new Chart(ctxB, {
+          type: 'bar',
+          data: {
+            labels: ['Enviadas', 'Recibidas', 'Respuestas'],
+            datasets: [{
+              data: [Number(client.templates_sent || 0), Number(client.templates_delivered || 0), Number(client.templates_replies || 0)],
+              backgroundColor: ['#94a3b8', '#38bdf8', '#22c55e']
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+      }
+
+      document.getElementById('client-modal')?.classList.remove('hidden');
+    }
+
+    document.getElementById('close-modal-btn').onclick = () => {
+      document.getElementById('client-modal')?.classList.add('hidden');
+      selectedClientForModal = null;
+    };
+    document.getElementById('client-modal').onclick = (e) => {
+      if (e.target.id === 'client-modal') {
+        document.getElementById('client-modal')?.classList.add('hidden');
+        selectedClientForModal = null;
+      }
+    };
+    document.getElementById('btn-delete-modal-client').onclick = async () => {
+      if (selectedClientForModal) {
+        await deleteClientById(selectedClientForModal.id, selectedClientForModal.name);
+        document.getElementById('client-modal')?.classList.add('hidden');
+        selectedClientForModal = null;
+      }
+    };
+
+    // Filtros
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.dataset.filter;
+        renderDashboard();
+        renderMatrix();
+      };
+    });
+
+    document.getElementById('client-search')?.addEventListener('input', (e) => {
+      searchQuery = (e.target.value || '').toLowerCase().trim();
+      renderDashboard();
+      renderMatrix();
+    });
+
+    // Limpiar BD
+    document.getElementById('btn-clear-db').onclick = async () => {
+      if (confirm("¿Deseas vaciar la base de datos de la cartera para comenzar a cargar clientes reales?")) {
+        try {
+          const res = await fetch('/api/clear-db', { method: 'POST' });
+          if (res.ok) {
+            showToast('🗑️ Cartera vaciada. Lista para nuevos clientes.');
+            clientsData = [];
+            renderAll();
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    };
+
+    // Cargar Demo
+    document.getElementById('btn-load-demo').onclick = async () => {
+      try {
+        const res = await fetch('/api/seed-demo', { method: 'POST' });
+        if (res.ok) {
+          showToast('✨ 5 Clientes demo cargados en la BD');
+          await fetchClients();
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    // Exportar Markdown
+    document.getElementById('btn-export-md').onclick = async () => {
+      try {
+        const res = await fetch('/api/export/markdown');
+        if (res.ok) {
+          const text = await res.text();
+          const blob = new Blob([text], { type: 'text/markdown;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `reporte_notebooklm_${new Date().toISOString().split('T')[0]}.md`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          showToast('📄 Reporte Markdown descargado con éxito');
+        }
+      } catch (e) {
+        showToast('❌ Error exportando markdown');
+      }
+    };
+
+    document.getElementById('btn-print').onclick = () => window.print();
+
+    // Iniciar
+    document.addEventListener('DOMContentLoaded', fetchClients);
+  </script>
+</body>
+</html>
