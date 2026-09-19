@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.spec
+
+# Base de datos local (para la nube se usa Supabase/Postgres)
+*.db
+*.sqlite3
+
+# Compilación PyInstaller y temporales
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Entorno y logs
+.env
+*.log
