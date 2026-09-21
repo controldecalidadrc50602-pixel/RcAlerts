@@ -967,7 +967,7 @@
             </div>
 
             <!-- Gráfica Amplia de Líneas de Tendencia Multimes -->
-            <div style="height: 380px; position: relative; margin-bottom: 20px; width: 100%;">
+            <div style="height: 450px; position: relative; margin-bottom: 20px; width: 100%;">
               <canvas id="clientHistoryTrendChart"></canvas>
             </div>
 
@@ -1045,7 +1045,7 @@
             </div>
 
             <!-- Gráfica de Tendencia de Mensajes -->
-            <div style="height: 380px; position: relative; margin-bottom: 20px; width: 100%;">
+            <div style="height: 450px; position: relative; margin-bottom: 20px; width: 100%;">
               <canvas id="clientMessagesTrendChart"></canvas>
             </div>
 
@@ -1121,7 +1121,7 @@
             </div>
 
             <!-- Gráfica Semanal Amplia -->
-            <div style="height: 320px; position: relative; margin-bottom: 20px; width: 100%;">
+            <div style="height: 400px; position: relative; margin-bottom: 20px; width: 100%;">
               <canvas id="clientWeeklyTrendChart"></canvas>
             </div>
 
@@ -1276,6 +1276,43 @@
       if (!url || typeof url !== 'string') return '#';
       const clean = url.trim();
       return /^(https?:\/\/)/i.test(clean) ? clean : '#';
+    }
+
+    // ==========================================
+    // FORMATEADORES UNIVERSALES CORPORATIVOS
+    // Miles con punto (.) y decimales con coma (,)
+    // ==========================================
+    function fmtInt(val) {
+      if (val === null || val === undefined || isNaN(val)) return '0';
+      const num = Math.round(Number(val));
+      const isNeg = num < 0;
+      const absStr = Math.abs(num).toString();
+      const withDots = absStr.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      return isNeg ? `-${withDots}` : withDots;
+    }
+
+    function fmtDec(val, decimals = 2) {
+      if (val === null || val === undefined || isNaN(val)) {
+        return '0,' + '0'.repeat(decimals);
+      }
+      const num = Number(val);
+      const isNeg = num < 0;
+      const parts = Math.abs(num).toFixed(decimals).split('.');
+      const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      const decimalPart = parts[1] || '0'.repeat(decimals);
+      const res = `${integerPart},${decimalPart}`;
+      return isNeg ? `-${res}` : res;
+    }
+
+    function fmtPct(val, decimals = 2) {
+      return `${fmtDec(val, decimals)}%`;
+    }
+
+    function fmtDeltaPct(val, decimals = 2) {
+      const num = Number(val || 0);
+      if (num > 0) return `↑ +${fmtDec(num, decimals)}%`;
+      if (num < 0) return `↓ ${fmtDec(num, decimals)}%`;
+      return `➔ ${fmtDec(0, decimals)}%`;
     }
 
     // UMBRALES Y SLAS CORPORATIVOS CONFIGURABLES
@@ -1877,31 +1914,31 @@
             <div class="metrics-mini-grid">
               <div>
                 <span style="color: var(--text-muted); font-size: 10px; display: block;">Sesiones</span>
-                <span style="font-weight: 700; font-family: monospace;">${Number(c.sessions || 0).toLocaleString()}</span>
+                <span style="font-weight: 700; font-family: monospace;">${fmtInt(c.sessions)}</span>
                 <span style="font-size: 10px; color: ${deltaPct >= 0 ? 'var(--success)' : 'var(--danger)'};">
-                  ${deltaPct >= 0 ? '+' : ''}${deltaPct}% (${deltaAbs >= 0 ? '+' : ''}${deltaAbs.toLocaleString()})
+                  ${deltaPct >= 0 ? '+' : ''}${fmtDec(deltaPct, 2)}% (${deltaAbs >= 0 ? '+' : ''}${fmtInt(deltaAbs)})
                 </span>
               </div>
               <div>
                 <span style="color: var(--text-muted); font-size: 10px; display: block;">Automatización</span>
-                <span style="font-weight: 700; font-family: monospace;">${Number(c.auto_ratio || 0).toFixed(0)}%</span>
-                <span style="font-size: 10px; color: var(--text-muted);">Bot (${Number(c.share_bot || 0).toFixed(0)}%)</span>
+                <span style="font-weight: 700; font-family: monospace;">${fmtPct(c.auto_ratio, 2)}</span>
+                <span style="font-size: 10px; color: var(--text-muted);">Bot (${fmtPct(c.share_bot, 2)})</span>
               </div>
               <div>
                 <span style="color: var(--text-muted); font-size: 10px; display: block;">Plantillas Enviadas</span>
-                <span style="font-weight: 700; font-family: monospace;">${Number(c.templates_sent || 0).toLocaleString()}</span>
+                <span style="font-weight: 700; font-family: monospace;">${fmtInt(c.templates_sent)}</span>
               </div>
               <div>
                 <span style="color: var(--text-muted); font-size: 10px; display: block;">Resp. Plantilla (Cant. y %)</span>
                 <span style="font-weight: 700; font-family: monospace; color: ${Number(c.reply_rate || 0) < 4 ? 'var(--danger)' : 'inherit'};">
-                  ${Number(c.templates_replies || 0).toLocaleString()} <span style="font-size: 10px; font-weight: 600;">(${Number(c.reply_rate || 0).toFixed(1)}%)</span>
+                  ${fmtInt(c.templates_replies)} <span style="font-size: 10px; font-weight: 600;">(${fmtPct(c.reply_rate, 2)})</span>
                 </span>
               </div>
             </div>
           </div>
 
           <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <span style="max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📍 ${escapeHtml(c.industry || 'General')} • ${Number(c.portfolio_share_sessions || 0).toFixed(1)}%</span>
+            <span style="max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📍 ${escapeHtml(c.industry || 'General')} • ${fmtPct(c.portfolio_share_sessions, 2)}</span>
             <div style="display: flex; gap: 6px; align-items: center;">
               <button onclick="event.stopPropagation(); openIngestForClient('${c.id}')" class="btn btn-sm" style="font-size: 10px; padding: 2px 7px; background: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; border-radius: 6px; cursor: pointer; font-weight: 600;" title="Adjuntar archivo de sesiones o plantillas para este cliente">📎 Adjuntar Archivos</button>
               <span style="font-weight: 700; color: var(--primary);">Ver Detalle →</span>
@@ -1911,18 +1948,18 @@
         grid.appendChild(card);
       });
 
-      document.getElementById('kpi-sessions').textContent = totalSessions.toLocaleString();
+      document.getElementById('kpi-sessions').textContent = fmtInt(totalSessions);
       const wowTotal = totalPrevSessions > 0 ? ((totalSessions - totalPrevSessions) / totalPrevSessions * 100) : 0;
       const wowAbs = totalSessions - totalPrevSessions;
       const kpiWowEl = document.getElementById('kpi-sessions-wow');
       if (kpiWowEl) {
-        kpiWowEl.textContent = `WoW: ${wowTotal >= 0 ? '+' : ''}${wowTotal.toFixed(1)}% (${wowAbs >= 0 ? '+' : ''}${wowAbs.toLocaleString()})`;
+        kpiWowEl.textContent = `WoW: ${wowTotal >= 0 ? '+' : ''}${fmtDec(wowTotal, 2)}% (${wowAbs >= 0 ? '+' : ''}${fmtInt(wowAbs)})`;
         kpiWowEl.style.color = wowTotal >= 0 ? 'var(--success)' : 'var(--danger)';
       }
 
-      document.getElementById('kpi-messages').textContent = totalMsgs.toLocaleString();
-      document.getElementById('kpi-automation').textContent = clientsData.length ? `${(sumAutoRatio / clientsData.length).toFixed(0)}%` : '0%';
-      document.getElementById('kpi-templates-rate').textContent = totalDelivered > 0 ? `${((totalReplies / totalDelivered) * 100).toFixed(1)}%` : '0%';
+      document.getElementById('kpi-messages').textContent = fmtInt(totalMsgs);
+      document.getElementById('kpi-automation').textContent = clientsData.length ? fmtPct(sumAutoRatio / clientsData.length, 2) : '0,00%';
+      document.getElementById('kpi-templates-rate').textContent = totalDelivered > 0 ? fmtPct((totalReplies / totalDelivered) * 100, 2) : '0,00%';
     }
 
     async function renderMatrix() {
@@ -1976,43 +2013,43 @@
             <strong>${escapeHtml(c.name || 'Sin Nombre')}</strong><br>
             <span style="font-size: 10px; color: var(--text-muted); font-family: monospace;">${escapeHtml(c.id || '')}</span>
           </td>
-          <td style="text-align: right; font-family: monospace; font-weight: 700;">${Number(c.sessions || 0).toLocaleString()}</td>
-          <td style="text-align: right; font-family: monospace; color: var(--text-muted);">${Number(c.prev_sessions || 0).toLocaleString()}</td>
+          <td style="text-align: right; font-family: monospace; font-weight: 700;">${fmtInt(c.sessions)}</td>
+          <td style="text-align: right; font-family: monospace; color: var(--text-muted);">${fmtInt(c.prev_sessions)}</td>
           <td style="text-align: right;">
             <span class="diff-badge ${diffClass}">
-              ${deltaAbs >= 0 ? '+' : ''}${deltaAbs.toLocaleString()}
+              ${deltaAbs >= 0 ? '+' : ''}${fmtInt(deltaAbs)}
             </span>
           </td>
           <td style="text-align: right;">
             <span class="diff-badge ${diffClass}">
-              ${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%
+              ${deltaPct >= 0 ? '+' : ''}${fmtDec(deltaPct, 2)}%
             </span>
           </td>
           <td style="text-align: right; font-family: monospace; font-size: 11px;">
-            <span title="Mensajes Usuario" style="color: #4f46e5; font-weight: 700;">👤 ${Number(c.user_msgs || 0).toLocaleString()}</span><br>
-            <span title="Mensajes Agente" style="color: #f59e0b; font-weight: 600;">👨‍💼 ${Number(c.agent_msgs || 0).toLocaleString()}</span> | 
-            <span title="Mensajes Bot" style="color: #a855f7;">🤖 ${Number(c.bot_msgs || 0).toLocaleString()}</span>
+            <span title="Mensajes Usuario" style="color: #4f46e5; font-weight: 700;">👤 ${fmtInt(c.user_msgs)}</span><br>
+            <span title="Mensajes Agente" style="color: #f59e0b; font-weight: 600;">👨‍💼 ${fmtInt(c.agent_msgs)}</span> | 
+            <span title="Mensajes Bot" style="color: #a855f7;">🤖 ${fmtInt(c.bot_msgs)}</span>
           </td>
           <td style="min-width: 140px;">
-            <div class="vertical-bar" title="Bot: ${Number(c.share_bot || 0).toFixed(1)}% | Agentes: ${Number(c.share_agent || 0).toFixed(1)}% | Usuario: ${Number(c.share_user || 0).toFixed(1)}%">
+            <div class="vertical-bar" title="Bot: ${fmtPct(c.share_bot, 2)} | Agentes: ${fmtPct(c.share_agent, 2)} | Usuario: ${fmtPct(c.share_user, 2)}">
               <div class="bar-bot" style="width: ${Number(c.share_bot || 0)}%"></div>
               <div class="bar-agent" style="width: ${Number(c.share_agent || 0)}%"></div>
               <div class="bar-user" style="width: ${Number(c.share_user || 0)}%"></div>
             </div>
             <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">
-              Bot: ${Number(c.share_bot || 0).toFixed(0)}% | Asesor: ${Number(c.share_agent || 0).toFixed(0)}% | User: ${Number(c.share_user || 0).toFixed(0)}%
+              Bot: ${fmtPct(c.share_bot, 0)} | Asesor: ${fmtPct(c.share_agent, 0)} | User: ${fmtPct(c.share_user, 0)}
             </div>
           </td>
           <td style="text-align: right;">
-            <strong style="font-family: monospace;">${Number(c.portfolio_share_sessions || 0).toFixed(1)}%</strong>
-            <div style="font-size: 10px; color: var(--text-muted);">${Number(c.portfolio_share_msgs || 0).toFixed(1)}% msgs</div>
+            <strong style="font-family: monospace;">${fmtPct(c.portfolio_share_sessions, 2)}</strong>
+            <div style="font-size: 10px; color: var(--text-muted);">${fmtPct(c.portfolio_share_msgs, 2)} msgs</div>
           </td>
           <td style="text-align: right; font-family: monospace;">
             <strong style="font-size: 13px; color: ${Number(c.reply_rate || 0) < 6 ? 'var(--danger)' : 'var(--success)'};">
-              ${Number(c.reply_rate || 0).toFixed(1)}%
+              ${fmtPct(c.reply_rate, 2)}
             </strong>
             <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
-              ${Number(c.templates_replies || 0).toLocaleString()} resp
+              ${fmtInt(c.templates_replies)} resp
             </div>
           </td>
           <td style="text-align: center;"><span class="badge ${qTier.badgeClass}" title="${qTier.interpretation}">${qTier.label}</span></td>
@@ -2120,7 +2157,7 @@
                 position: 'left',
                 title: { display: true, text: 'Sesiones Inbound', font: { size: 10, weight: 'bold' }, color: '#4f46e5' },
                 grid: { color: '#f1f5f9' },
-                ticks: { color: '#4f46e5', callback: v => v.toLocaleString() }
+                ticks: { color: '#4f46e5', callback: v => fmtInt(v) }
               },
               yMsg: {
                 type: 'linear',
@@ -2128,7 +2165,7 @@
                 position: 'right',
                 title: { display: true, text: 'Cantidad Mensajes', font: { size: 10, weight: 'bold' }, color: '#6366f1' },
                 grid: { drawOnChartArea: false },
-                ticks: { color: '#6366f1', callback: v => v.toLocaleString() }
+                ticks: { color: '#6366f1', callback: v => fmtInt(v) }
               },
               yResp: {
                 type: 'linear',
@@ -2136,11 +2173,16 @@
                 position: 'right',
                 title: { display: true, text: 'Respuestas WhatsApp', font: { size: 10, weight: 'bold' }, color: '#10b981' },
                 grid: { drawOnChartArea: false },
-                ticks: { color: '#10b981', callback: v => v.toLocaleString() }
+                ticks: { color: '#10b981', callback: v => fmtInt(v) }
               }
             },
             plugins: {
-              legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11, weight: '600' } } }
+              legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11, weight: '600' } } },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => ` ${ctx.dataset.label}: ${fmtInt(ctx.parsed.y)}`
+                }
+              }
             }
           }
         });
@@ -2177,10 +2219,15 @@
           maintainAspectRatio: false,
           scales: {
             x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
-            y: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }
+            y: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, callback: v => fmtInt(v) } }
           },
           plugins: {
-            legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11, weight: '600' } } }
+            legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11, weight: '600' } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` ${ctx.dataset.label}: ${fmtInt(ctx.parsed.y)}`
+              }
+            }
           }
         }
       });
@@ -2228,27 +2275,12 @@
           // Línea Benchmark Plantillas (Y = 10%)
           const yLine = y.getPixelForValue(10);
           ctx.beginPath();
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 1.5;
           ctx.moveTo(left, yLine);
           ctx.lineTo(right, yLine);
           ctx.stroke();
-
-          // Etiquetas de cuadrantes
-          ctx.setLineDash([]);
-          ctx.font = 'bold 9px sans-serif';
-          ctx.fillStyle = '#94a3b8';
-          ctx.fillText('⭐ Alta Auto + Alta Conv', Math.max(xLine + 8, left + 10), top + 15);
-          ctx.fillText('📨 Alta Respuesta (>10%)', left + 8, top + 15);
-          ctx.fillText('🤖 Alta Auto (>55%)', Math.max(xLine + 8, left + 10), bottom - 8);
-          ctx.fillText('⚠️ Atención (<10% Resp)', left + 8, bottom - 8);
-
-          // Nombre y datos sobre los puntos
-          chart.data.datasets[0].data.forEach(pt => {
-            const px = x.getPixelForValue(pt.x);
-            const py = y.getPixelForValue(pt.y);
-            ctx.font = 'bold 10px sans-serif';
-            ctx.fillStyle = '#1e293b';
-            ctx.fillText(`${pt.clientName} (${pt.x.toFixed(0)}% bot, ${pt.y.toFixed(1)}% resp)`, px + 8, py - 6);
-          });
 
           ctx.restore();
         }
@@ -2293,14 +2325,14 @@
                 label: (ctx) => {
                   const raw = ctx?.raw || {};
                   const name = raw.clientName || 'Cliente';
-                  const xVal = Number(raw.x || 0).toFixed(1);
-                  const yVal = Number(raw.y || 0).toFixed(1);
-                  const rep = Number(raw.replies || 0).toLocaleString();
-                  const del = Number(raw.delivered || 0).toLocaleString();
+                  const xVal = fmtPct(raw.x, 2);
+                  const yVal = fmtPct(raw.y, 2);
+                  const rep = fmtInt(raw.replies);
+                  const del = fmtInt(raw.delivered);
                   return [
                     `🏢 ${name}`,
-                    `🤖 Automatización Bot: ${xVal}%`,
-                    `📨 Tasa Respuesta: ${yVal}% (${rep} resp / ${del} entregadas)`
+                    `🤖 Automatización Bot: ${xVal}`,
+                    `📨 Tasa Respuesta: ${yVal} (${rep} resp / ${del} entregadas)`
                   ];
                 }
               }
@@ -2329,8 +2361,8 @@
       const totalRep = repliesData.reduce((a, b) => a + b, 0);
       const badgeEl = document.getElementById('correlation-summary-badge');
       if (badgeEl) {
-        const rate = totalDel > 0 ? ((totalRep / totalDel) * 100).toFixed(1) : '0.0';
-        badgeEl.textContent = `🎯 Efectividad Global Outbound: ${rate}% (${totalRep.toLocaleString()} respuestas de ${totalDel.toLocaleString()} entregadas)`;
+        const rate = totalDel > 0 ? ((totalRep / totalDel) * 100) : 0;
+        badgeEl.textContent = `🎯 Efectividad Global Outbound: ${fmtPct(rate, 2)} (${fmtInt(totalRep)} respuestas de ${fmtInt(totalDel)} entregadas)`;
       }
 
       funnelCorrelationInstance = new Chart(ctx3, {
@@ -2349,20 +2381,21 @@
           maintainAspectRatio: false,
           scales: {
             x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-            y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }
+            y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, callback: v => fmtInt(v) } }
           },
           plugins: {
             legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
             tooltip: {
               callbacks: {
+                label: (ctx) => ` ${ctx.dataset.label}: ${fmtInt(ctx.parsed.y)}`,
                 afterLabel: (ctx) => {
                   const idx = ctx.dataIndex;
                   const c = clientsData[idx];
                   if (ctx.datasetIndex === 2) {
-                    return `👉 Tasa de Respuesta: ${Number(c?.reply_rate || 0).toFixed(1)}%`;
+                    return `👉 Tasa de Respuesta: ${fmtPct(c?.reply_rate, 2)}`;
                   }
                   if (ctx.datasetIndex === 1) {
-                    return `👉 Tasa de Entrega: ${Number(c?.delivery_rate || 0).toFixed(1)}%`;
+                    return `👉 Tasa de Entrega: ${fmtPct(c?.delivery_rate, 2)}`;
                   }
                   return '';
                 }
@@ -2519,9 +2552,9 @@
           if (idx === 0) {
             totArrowBadge = `<span style="font-size: 10px; color: #94a3b8; font-weight: 600; margin-left: 4px;">(Base)</span>`;
           } else if (deltaTot > 0) {
-            totArrowBadge = `<span style="display:inline-flex; align-items:center; gap:2px; font-size:10px; font-weight:800; color:#10b981; background:#dcfce7; padding:2px 6px; border-radius:6px; margin-left:5px;" title="Interacción subió +${deltaTot.toLocaleString()} msgs (+${deltaTotPct.toFixed(1)}%)">↑ +${deltaTotPct.toFixed(0)}%</span>`;
+            totArrowBadge = `<span style="display:inline-flex; align-items:center; gap:2px; font-size:10px; font-weight:800; color:#10b981; background:#dcfce7; padding:2px 6px; border-radius:6px; margin-left:5px;" title="Interacción subió +${fmtInt(deltaTot)} msgs (+${fmtDec(deltaTotPct, 2)}%)">↑ +${fmtDec(deltaTotPct, 2)}%</span>`;
           } else if (deltaTot < 0) {
-            totArrowBadge = `<span style="display:inline-flex; align-items:center; gap:2px; font-size:10px; font-weight:800; color:#ef4444; background:#fee2e2; padding:2px 6px; border-radius:6px; margin-left:5px;" title="Interacción bajó ${deltaTot.toLocaleString()} msgs (${deltaTotPct.toFixed(1)}%)">↓ ${deltaTotPct.toFixed(0)}%</span>`;
+            totArrowBadge = `<span style="display:inline-flex; align-items:center; gap:2px; font-size:10px; font-weight:800; color:#ef4444; background:#fee2e2; padding:2px 6px; border-radius:6px; margin-left:5px;" title="Interacción bajó ${fmtInt(deltaTot)} msgs (${fmtDec(deltaTotPct, 2)}%)">↓ ${fmtDec(deltaTotPct, 2)}%</span>`;
           } else {
             totArrowBadge = `<span style="font-size: 10px; color: #94a3b8; margin-left: 5px;">➔ 0%</span>`;
           }
@@ -2530,48 +2563,48 @@
           const prevU = prevH ? Number(prevH.user_msgs || 0) : 0;
           let uArrow = '';
           if (idx > 0) {
-            if (userMsgs > prevU) uArrow = `<span style="color:#10b981; font-weight:800; margin-left:3px;" title="Respuestas de usuarios subieron">↑</span>`;
-            else if (userMsgs < prevU) uArrow = `<span style="color:#ef4444; font-weight:800; margin-left:3px;" title="Respuestas de usuarios bajaron">↓</span>`;
+            if (userMsgs > prevU) uArrow = `<span style="color:#10b981; font-weight:800; margin-left:3px;" title="Respuestas de usuarios subieron +${fmtInt(userMsgs - prevU)}">↑</span>`;
+            else if (userMsgs < prevU) uArrow = `<span style="color:#ef4444; font-weight:800; margin-left:3px;" title="Respuestas de usuarios bajaron ${fmtInt(prevU - userMsgs)}">↓</span>`;
           }
 
           tr.innerHTML = `
             <td style="font-weight: 700; font-family: monospace; white-space: nowrap;">📅 ${escapeHtml(h.report_date || 'Reciente')}</td>
-            <td style="text-align: right; font-family: monospace; font-weight: 700;">${Number(h.sessions || 0).toLocaleString()}</td>
-            <td style="text-align: right; font-family: monospace; color: var(--text-muted);">${Number(h.prev_sessions || 0).toLocaleString()}</td>
+            <td style="text-align: right; font-family: monospace; font-weight: 700;">${fmtInt(h.sessions)}</td>
+            <td style="text-align: right; font-family: monospace; color: var(--text-muted);">${fmtInt(h.prev_sessions)}</td>
             <td style="text-align: right;">
               <span class="diff-badge ${diffClass}">
-                ${deltaAbs >= 0 ? '↑ +' : '↓ '}${Math.abs(deltaAbs).toLocaleString()}
+                ${deltaAbs >= 0 ? '↑ +' : '↓ '}${fmtInt(Math.abs(deltaAbs))}
               </span>
             </td>
             <td style="text-align: right;">
               <span class="diff-badge ${diffClass}">
-                ${deltaPct >= 0 ? '↑ +' : '↓ '}${Math.abs(deltaPct).toFixed(1)}%
+                ${deltaPct >= 0 ? '↑ +' : '↓ '}${fmtDec(Math.abs(deltaPct), 2)}%
               </span>
             </td>
             <td style="text-align: right; font-family: monospace; font-weight: 800; white-space: nowrap;">
-              ${totalMsgsRow.toLocaleString()}${totArrowBadge}
+              ${fmtInt(totalMsgsRow)}${totArrowBadge}
             </td>
             <td style="text-align: right; font-family: monospace; font-size: 11px;">
-              <span title="Mensajes Usuario" style="color: #4f46e5; font-weight: 700;">👤 ${userMsgs.toLocaleString()}${uArrow}</span><br>
-              <span title="Mensajes Asesor" style="color: #f59e0b; font-weight: 600;">👨‍💼 ${agentMsgs.toLocaleString()}</span> | 
-              <span title="Mensajes Bot" style="color: #a855f7;">🤖 ${botMsgs.toLocaleString()}</span>
+              <span title="Mensajes Usuario" style="color: #4f46e5; font-weight: 700;">👤 ${fmtInt(userMsgs)}${uArrow}</span><br>
+              <span title="Mensajes Asesor" style="color: #f59e0b; font-weight: 600;">👨‍💼 ${fmtInt(agentMsgs)}</span> | 
+              <span title="Mensajes Bot" style="color: #a855f7;">🤖 ${fmtInt(botMsgs)}</span>
             </td>
             <td style="min-width: 140px;">
-              <div class="vertical-bar" title="Bot: ${shareBot.toFixed(1)}% | Asesor: ${shareAgent.toFixed(1)}% | Usuario: ${shareUser.toFixed(1)}%">
+              <div class="vertical-bar" title="Bot: ${fmtPct(shareBot, 2)} | Asesor: ${fmtPct(shareAgent, 2)} | Usuario: ${fmtPct(shareUser, 2)}">
                 <div class="bar-bot" style="width: ${shareBot}%"></div>
                 <div class="bar-agent" style="width: ${shareAgent}%"></div>
                 <div class="bar-user" style="width: ${shareUser}%"></div>
               </div>
               <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">
-                Bot: ${shareBot.toFixed(0)}% | Asesor: ${shareAgent.toFixed(0)}% | User: ${shareUser.toFixed(0)}%
+                Bot: ${fmtPct(shareBot, 0)} | Asesor: ${fmtPct(shareAgent, 0)} | User: ${fmtPct(shareUser, 0)}
               </div>
             </td>
             <td style="text-align: right; font-family: monospace;">
               <strong style="font-size: 13px; color: ${Number(h.reply_rate || 0) < 6 ? 'var(--danger)' : 'var(--success)'};">
-                ${Number(h.reply_rate || 0).toFixed(1)}%
+                ${fmtPct(h.reply_rate, 2)}
               </strong>
               <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
-                ${Number(h.templates_replies || 0).toLocaleString()} resp
+                ${fmtInt(h.templates_replies)} resp
               </div>
             </td>
             <td style="text-align: center;"><span class="badge ${qTier.badgeClass}" title="${qTier.interpretation}">${qTier.label}</span></td>
@@ -2929,7 +2962,7 @@
       validClients.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.id;
-        opt.textContent = `🏢 ${c.name} (${Number(c.sessions || 0).toLocaleString()} sesiones)`;
+        opt.textContent = `🏢 ${c.name} (${fmtInt(c.sessions)} sesiones)`;
         sel.appendChild(opt);
       });
 
@@ -2972,13 +3005,13 @@
 
           // Si no se adjuntó un nuevo archivo de sesiones, tomar los números ya registrados en la cartera
           if (!pendingSessionsData) {
-            document.getElementById('sum-sessions').textContent = Number(client.sessions || 0).toLocaleString();
-            document.getElementById('sum-user-msgs').textContent = Number(client.user_msgs || 0).toLocaleString();
-            document.getElementById('sum-bot-msgs').textContent = Number(client.bot_msgs || 0).toLocaleString();
-            document.getElementById('sum-agent-msgs').textContent = Number(client.agent_msgs || 0).toLocaleString();
+            document.getElementById('sum-sessions').textContent = fmtInt(client.sessions);
+            document.getElementById('sum-user-msgs').textContent = fmtInt(client.user_msgs);
+            document.getElementById('sum-bot-msgs').textContent = fmtInt(client.bot_msgs);
+            document.getElementById('sum-agent-msgs').textContent = fmtInt(client.agent_msgs);
 
             if (lblSessFile) lblSessFile.textContent = `Sesiones activas registradas de ${client.name}`;
-            if (lblSessStats) lblSessStats.textContent = `${Number(client.sessions || 0).toLocaleString()} sesiones | ${Number(client.total_msgs || (client.user_msgs + client.bot_msgs + client.agent_msgs)).toLocaleString()} mensajes`;
+            if (lblSessStats) lblSessStats.textContent = `${fmtInt(client.sessions)} sesiones | ${fmtInt(client.total_msgs || (client.user_msgs + client.bot_msgs + client.agent_msgs))} mensajes`;
           }
         }
       }
@@ -3400,7 +3433,8 @@
           pointHoverRadius: 10,
           pointBackgroundColor: '#10b981',
           showDataLabels: true,
-          dataLabelFormatter: (val) => `${val.toLocaleString()} resp`,
+          dataLabelTextColor: '#065f46',
+          dataLabelFormatter: (val) => `${fmtInt(val)} resp`,
           order: 1
         });
       }
@@ -3431,7 +3465,8 @@
           pointStyle: 'rectRot',
           pointBackgroundColor: '#06b6d4',
           showDataLabels: true,
-          dataLabelFormatter: (val) => `${val.toFixed(1)}%`,
+          dataLabelTextColor: '#0e7490',
+          dataLabelFormatter: (val) => fmtPct(val, 2),
           order: 1
         });
       }
@@ -3450,7 +3485,8 @@
           pointHoverRadius: 9,
           pointBackgroundColor: '#10b981',
           showDataLabels: true,
-          dataLabelFormatter: (val) => `${val.toLocaleString()} resp`,
+          dataLabelTextColor: '#065f46',
+          dataLabelFormatter: (val) => `${fmtInt(val)} resp`,
           order: 1
         });
         datasets.push({
@@ -3495,13 +3531,15 @@
             display: true, 
             text: 'Sesiones Inbound', 
             font: { size: 11, weight: 'bold' },
-            color: '#4f46e5'
+            color: '#4f46e5',
+            padding: { bottom: 8 }
           },
           grid: { color: '#f1f5f9' },
           ticks: { 
             font: { size: 10, weight: '600' },
             color: '#4f46e5',
-            callback: v => v.toLocaleString()
+            padding: 8,
+            callback: v => fmtInt(v)
           }
         }
       };
@@ -3515,15 +3553,17 @@
             display: true, 
             text: 'Cantidad Respuestas Reales (WhatsApp)', 
             font: { size: 11, weight: 'bold' },
-            color: '#10b981'
+            color: '#059669',
+            padding: { bottom: 8 }
           },
           min: 0,
           max: yRespMax,
           grid: { drawOnChartArea: false },
           ticks: {
             font: { size: 10, weight: 'bold' },
-            color: '#10b981',
-            callback: v => v.toLocaleString() + ' resp'
+            color: '#059669',
+            padding: 8,
+            callback: v => `${fmtInt(v)} resp`
           }
         };
       } else if (currentHistoryChartMode === 'replies-rate') {
@@ -3535,7 +3575,8 @@
             display: true, 
             text: 'Porcentaje (%)', 
             font: { size: 11, weight: 'bold' },
-            color: '#0891b2'
+            color: '#0891b2',
+            padding: { bottom: 8 }
           },
           min: 0,
           max: 100,
@@ -3543,7 +3584,8 @@
           ticks: { 
             font: { size: 10, weight: '600' },
             color: '#0891b2',
-            callback: v => v + '%'
+            padding: 8,
+            callback: v => `${fmtInt(v)}%`
           }
         };
       } else if (currentHistoryChartMode === 'both') {
@@ -3554,16 +3596,18 @@
           title: { 
             display: true, 
             text: 'Cant. Respuestas', 
-            font: { size: 10, weight: 'bold' },
-            color: '#10b981'
+            font: { size: 11, weight: 'bold' },
+            color: '#059669',
+            padding: { bottom: 6 }
           },
           min: 0,
           max: yRespMax,
           grid: { drawOnChartArea: false },
           ticks: {
             font: { size: 10, weight: 'bold' },
-            color: '#10b981',
-            callback: v => v.toLocaleString()
+            color: '#059669',
+            padding: 6,
+            callback: v => fmtInt(v)
           }
         };
         scales.yPct = {
@@ -3573,29 +3617,31 @@
           title: { 
             display: true, 
             text: 'Porcentaje (%)', 
-            font: { size: 10, weight: 'bold' },
-            color: '#a855f7'
+            font: { size: 11, weight: 'bold' },
+            color: '#7c3aed',
+            padding: { bottom: 6 }
           },
           min: 0,
           max: 100,
           grid: { drawOnChartArea: false },
           ticks: { 
-            font: { size: 10 },
-            color: '#a855f7',
-            callback: v => v + '%'
+            font: { size: 10, weight: '600' },
+            color: '#7c3aed',
+            padding: 6,
+            callback: v => `${fmtInt(v)}%`
           }
         };
       }
 
-      // Plugin para dibujar la cantidad real en negrita sobre cada punto
+      // Plugin con pastilla opaca de alto contraste para evitar corte o distorsión con líneas
       const dataLabelsPlugin = {
         id: 'historyDataLabelsPlugin',
         afterDatasetsDraw(chart) {
           const { ctx } = chart;
           ctx.save();
-          ctx.font = 'bold 11px sans-serif';
+          ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
           ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
+          ctx.textBaseline = 'middle';
 
           chart.data.datasets.forEach((dataset, datasetIdx) => {
             if (dataset.showDataLabels) {
@@ -3603,9 +3649,46 @@
               meta.data.forEach((point, idx) => {
                 const val = dataset.data[idx];
                 if (val !== undefined && val !== null) {
-                  ctx.fillStyle = dataset.borderColor || '#10b981';
-                  const text = dataset.dataLabelFormatter ? dataset.dataLabelFormatter(val, idx) : String(val);
-                  ctx.fillText(text, point.x, point.y - 8);
+                  const text = dataset.dataLabelFormatter ? dataset.dataLabelFormatter(val, idx) : fmtInt(val);
+                  const textMetrics = ctx.measureText(text);
+                  const textW = textMetrics.width;
+                  const padX = 7;
+                  const bW = textW + (padX * 2);
+                  const bH = 20;
+                  const bX = point.x - (bW / 2);
+                  const bY = point.y > 45 ? (point.y - 25) : (point.y + 12);
+
+                  // Sombra suave para despegar del fondo
+                  ctx.save();
+                  ctx.shadowColor = 'rgba(0, 0, 0, 0.16)';
+                  ctx.shadowBlur = 5;
+                  ctx.shadowOffsetY = 2;
+                  ctx.fillStyle = '#ffffff';
+                  ctx.beginPath();
+                  if (ctx.roundRect) {
+                    ctx.roundRect(bX, bY, bW, bH, 5);
+                  } else {
+                    ctx.rect(bX, bY, bW, bH);
+                  }
+                  ctx.fill();
+                  ctx.restore();
+
+                  // Borde nítido en el color del dataset
+                  ctx.save();
+                  ctx.strokeStyle = dataset.borderColor || '#10b981';
+                  ctx.lineWidth = 1.5;
+                  ctx.beginPath();
+                  if (ctx.roundRect) {
+                    ctx.roundRect(bX, bY, bW, bH, 5);
+                  } else {
+                    ctx.rect(bX, bY, bW, bH);
+                  }
+                  ctx.stroke();
+                  ctx.restore();
+
+                  // Texto con contraste óptimo
+                  ctx.fillStyle = dataset.dataLabelTextColor || '#065f46';
+                  ctx.fillText(text, point.x, bY + (bH / 2) + 0.5);
                 }
               });
             }
@@ -3623,6 +3706,14 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: {
+            padding: {
+              top: 32,
+              bottom: 12,
+              left: 10,
+              right: currentHistoryChartMode === 'both' ? 32 : 15
+            }
+          },
           interaction: { mode: 'index', intersect: false },
           scales: scales,
           plugins: {
@@ -3634,13 +3725,13 @@
                   const idx = ctx.dataIndex;
                   const item = currentClientHistory[idx];
                   if (ctx.dataset.yAxisID === 'yResp') {
-                    const rate = item ? Number(item.reply_rate || 0).toFixed(1) : '0';
-                    return ` 📨 Cantidad Respuestas: ${val.toLocaleString()} respuestas reales (${rate}% tasa)`;
+                    const rate = item ? Number(item.reply_rate || 0) : 0;
+                    return ` 📨 Cantidad Respuestas: ${fmtInt(val)} respuestas reales (${fmtPct(rate, 2)} tasa)`;
                   }
                   if (ctx.dataset.yAxisID === 'yPct') {
-                    return ` ${ctx.dataset.label}: ${val.toFixed(1)}%`;
+                    return ` ${ctx.dataset.label}: ${fmtPct(val, 2)}`;
                   }
-                  return ` ${ctx.dataset.label}: ${val.toLocaleString()} sesiones`;
+                  return ` ${ctx.dataset.label}: ${fmtInt(val)} sesiones`;
                 }
               }
             }
@@ -3694,8 +3785,8 @@
       };
 
       if (currentMessagesChartMode === 'messages-count') {
-        scales.y.title = { display: true, text: 'Cantidad de Mensajes (Respuestas)', font: { size: 11, weight: 'bold' }, color: '#1e1b4b' };
-        scales.y.ticks.callback = v => v.toLocaleString();
+        scales.y.title = { display: true, text: 'Cantidad de Mensajes (Respuestas)', font: { size: 11, weight: 'bold' }, color: '#1e1b4b', padding: { bottom: 8 } };
+        scales.y.ticks = { font: { size: 10, weight: '600' }, callback: v => fmtInt(v), padding: 8 };
 
         datasets.push({
           label: '👤 Mensajes Usuario (Respuestas Inbound)',
@@ -3708,7 +3799,8 @@
           pointHoverRadius: 9,
           pointBackgroundColor: '#4f46e5',
           showDataLabels: true,
-          dataLabelFormatter: (val) => `${val.toLocaleString()} u`,
+          dataLabelTextColor: '#1e1b4b',
+          dataLabelFormatter: (val) => `${fmtInt(val)} u`,
           order: 1
         });
         datasets.push({
@@ -3722,7 +3814,8 @@
           pointHoverRadius: 9,
           pointBackgroundColor: '#f59e0b',
           showDataLabels: true,
-          dataLabelFormatter: (val) => `${val.toLocaleString()} a`,
+          dataLabelTextColor: '#78350f',
+          dataLabelFormatter: (val) => `${fmtInt(val)} a`,
           order: 2
         });
         datasets.push({
@@ -3750,10 +3843,10 @@
           order: 4
         });
       } else if (currentMessagesChartMode === 'messages-mix') {
-        scales.y.title = { display: true, text: '% Participación de Mensajes', font: { size: 11, weight: 'bold' }, color: '#1e1b4b' };
+        scales.y.title = { display: true, text: '% Participación de Mensajes', font: { size: 11, weight: 'bold' }, color: '#1e1b4b', padding: { bottom: 8 } };
         scales.y.min = 0;
         scales.y.max = 100;
-        scales.y.ticks.callback = v => v + '%';
+        scales.y.ticks = { font: { size: 10, weight: '600' }, callback: v => `${fmtInt(v)}%`, padding: 8 };
 
         const userPctData = currentClientHistory.map(h => {
           const tot = Number(h.user_msgs || 0) + Number(h.agent_msgs || 0) + Number(h.bot_msgs || 0);
@@ -3777,7 +3870,8 @@
           fill: true,
           pointRadius: 6,
           showDataLabels: true,
-          dataLabelFormatter: (val) => `${val}%`,
+          dataLabelTextColor: '#1e1b4b',
+          dataLabelFormatter: (val) => fmtPct(val, 2),
           order: 1
         });
         datasets.push({
@@ -3788,7 +3882,8 @@
           fill: false,
           pointRadius: 6,
           showDataLabels: true,
-          dataLabelFormatter: (val) => `${val}%`,
+          dataLabelTextColor: '#78350f',
+          dataLabelFormatter: (val) => fmtPct(val, 2),
           order: 2
         });
         datasets.push({
@@ -3802,8 +3897,8 @@
           order: 3
         });
       } else if (currentMessagesChartMode === 'messages-ratio') {
-        scales.y.title = { display: true, text: 'Ratio Interacción (Msgs Usuario por cada Msg de Asesor)', font: { size: 11, weight: 'bold' }, color: '#1e1b4b' };
-        scales.y.ticks.callback = v => v.toFixed(1) + 'x';
+        scales.y.title = { display: true, text: 'Ratio Interacción (Msgs Usuario por cada Msg de Asesor)', font: { size: 11, weight: 'bold' }, color: '#1e1b4b', padding: { bottom: 8 } };
+        scales.y.ticks = { font: { size: 10, weight: '600' }, callback: v => `${fmtDec(v, 2)}x`, padding: 8 };
 
         const ratioData = currentClientHistory.map(h => {
           const a = Number(h.agent_msgs || 0);
@@ -3822,7 +3917,8 @@
           pointHoverRadius: 10,
           pointBackgroundColor: '#10b981',
           showDataLabels: true,
-          dataLabelFormatter: (val) => `${val.toFixed(2)}x`,
+          dataLabelTextColor: '#065f46',
+          dataLabelFormatter: (val) => `${fmtDec(val, 2)}x`,
           order: 1
         });
       }
@@ -3832,18 +3928,55 @@
         afterDatasetsDraw(chart) {
           const { ctx } = chart;
           ctx.save();
-          ctx.font = 'bold 11px sans-serif';
+          ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
           ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
+          ctx.textBaseline = 'middle';
           chart.data.datasets.forEach((dataset, datasetIdx) => {
             if (dataset.showDataLabels) {
               const meta = chart.getDatasetMeta(datasetIdx);
               meta.data.forEach((point, idx) => {
                 const val = dataset.data[idx];
                 if (val !== undefined && val !== null) {
-                  ctx.fillStyle = dataset.borderColor || '#4f46e5';
-                  const text = dataset.dataLabelFormatter ? dataset.dataLabelFormatter(val, idx) : String(val);
-                  ctx.fillText(text, point.x, point.y - 8);
+                  const text = dataset.dataLabelFormatter ? dataset.dataLabelFormatter(val, idx) : fmtInt(val);
+                  const textMetrics = ctx.measureText(text);
+                  const textW = textMetrics.width;
+                  const padX = 7;
+                  const bW = textW + (padX * 2);
+                  const bH = 20;
+                  const bX = point.x - (bW / 2);
+                  const bY = point.y > 45 ? (point.y - 25) : (point.y + 12);
+
+                  // Sombra suave para despegar del fondo
+                  ctx.save();
+                  ctx.shadowColor = 'rgba(0, 0, 0, 0.16)';
+                  ctx.shadowBlur = 5;
+                  ctx.shadowOffsetY = 2;
+                  ctx.fillStyle = '#ffffff';
+                  ctx.beginPath();
+                  if (ctx.roundRect) {
+                    ctx.roundRect(bX, bY, bW, bH, 5);
+                  } else {
+                    ctx.rect(bX, bY, bW, bH);
+                  }
+                  ctx.fill();
+                  ctx.restore();
+
+                  // Borde nítido en el color del dataset
+                  ctx.save();
+                  ctx.strokeStyle = dataset.borderColor || '#4f46e5';
+                  ctx.lineWidth = 1.5;
+                  ctx.beginPath();
+                  if (ctx.roundRect) {
+                    ctx.roundRect(bX, bY, bW, bH, 5);
+                  } else {
+                    ctx.rect(bX, bY, bW, bH);
+                  }
+                  ctx.stroke();
+                  ctx.restore();
+
+                  // Texto de alto contraste
+                  ctx.fillStyle = dataset.dataLabelTextColor || '#1e1b4b';
+                  ctx.fillText(text, point.x, bY + (bH / 2) + 0.5);
                 }
               });
             }
@@ -3858,10 +3991,32 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: {
+            padding: {
+              top: 32,
+              bottom: 12,
+              left: 10,
+              right: 20
+            }
+          },
           interaction: { mode: 'index', intersect: false },
           scales,
           plugins: {
-            legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11, weight: '600' } } }
+            legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11, weight: '600' } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const val = ctx.parsed.y;
+                  if (currentMessagesChartMode === 'messages-mix') {
+                    return ` ${ctx.dataset.label}: ${fmtPct(val, 2)}`;
+                  }
+                  if (currentMessagesChartMode === 'messages-ratio') {
+                    return ` ${ctx.dataset.label}: ${fmtDec(val, 2)}x`;
+                  }
+                  return ` ${ctx.dataset.label}: ${fmtInt(val)} msgs`;
+                }
+              }
+            }
           }
         },
         plugins: [msgDataLabelsPlugin]
@@ -3957,15 +4112,15 @@
       const elStatus = document.getElementById('modal-weekly-kpi-status');
 
       if (elMoM) {
-        elMoM.textContent = `${momPct >= 0 ? '+' : ''}${momPct.toFixed(1)}%`;
+        elMoM.textContent = `${momPct >= 0 ? '+' : ''}${fmtDec(momPct, 2)}%`;
         elMoM.style.color = momPct >= 0 ? '#10b981' : '#ef4444';
       }
       if (elWoW) {
-        elWoW.textContent = `${lastWoWPct >= 0 ? '+' : ''}${lastWoWPct.toFixed(1)}%`;
+        elWoW.textContent = `${lastWoWPct >= 0 ? '+' : ''}${fmtDec(lastWoWPct, 2)}%`;
         elWoW.style.color = lastWoWPct >= 0 ? '#10b981' : '#ef4444';
       }
       if (elDiv) {
-        elDiv.textContent = `${divergence >= 0 ? '+' : ''}${divergence.toFixed(1)} pts`;
+        elDiv.textContent = `${divergence >= 0 ? '+' : ''}${fmtDec(divergence, 2)} pts`;
         elDiv.style.color = divergence >= thresholds.critDivergence ? '#ef4444' : '#6366f1';
       }
 
@@ -3981,11 +4136,11 @@
               <div style="font-size: 24px;">🚨</div>
               <div>
                 <h4 style="font-size: 13px; font-weight: 800; color: #991b1b;">
-                  ALERTA TEMPRANA: Desaceleración Oculta (Divergencia MoM − WoW: +${divergence.toFixed(1)}%)
+                  ALERTA TEMPRANA: Desaceleración Oculta (Divergencia MoM − WoW: +${fmtDec(divergence, 2)}%)
                 </h4>
                 <p style="font-size: 12px; color: #9f1239; margin-top: 3px; line-height: 1.5;">
-                  A pesar de que el mes muestra una inercia de <strong>${momPct >= 0 ? '+' : ''}${momPct.toFixed(1)}% MoM</strong>, la última semana sufre una caída abrupta de <strong>${lastWoWPct >= 0 ? '+' : ''}${lastWoWPct.toFixed(1)}% WoW</strong>.
-                  La divergencia de <strong>+${divergence.toFixed(1)} puntos</strong> supera el umbral crítico (${thresholds.critDivergence} pts), anticipando una fuerte contracción.
+                  A pesar de que el mes muestra una inercia de <strong>${momPct >= 0 ? '+' : ''}${fmtDec(momPct, 2)}% MoM</strong>, la última semana sufre una caída abrupta de <strong>${lastWoWPct >= 0 ? '+' : ''}${fmtDec(lastWoWPct, 2)}% WoW</strong>.
+                  La divergencia de <strong>+${fmtDec(divergence, 2)} puntos</strong> supera el umbral crítico (${thresholds.critDivergence} pts), anticipando una fuerte contracción.
                 </p>
               </div>
             </div>
@@ -4006,10 +4161,10 @@
               <div style="font-size: 24px;">⚠️</div>
               <div>
                 <h4 style="font-size: 13px; font-weight: 800; color: #92400e;">
-                  PRECAUCIÓN: Contracción Semanal Marcada (WoW: ${lastWoWPct.toFixed(1)}%)
+                  PRECAUCIÓN: Contracción Semanal Marcada (WoW: ${fmtDec(lastWoWPct, 2)}%)
                 </h4>
                 <p style="font-size: 12px; color: #b45309; margin-top: 3px; line-height: 1.5;">
-                  La última semana presenta una reducción del <strong>${Math.abs(lastWoWPct).toFixed(1)}% WoW</strong> en sesiones, rebasando el límite de tolerancia (${thresholds.critWow}%). Divergencia MoM − WoW: ${divergence.toFixed(1)} pts.
+                  La última semana presenta una reducción del <strong>${fmtDec(Math.abs(lastWoWPct), 2)}% WoW</strong> en sesiones, rebasando el límite de tolerancia (${thresholds.critWow}%). Divergencia MoM − WoW: ${fmtDec(divergence, 2)} pts.
                 </p>
               </div>
             </div>
@@ -4033,7 +4188,7 @@
                   Ritmo Semanal Estable y Armónico
                 </h4>
                 <p style="font-size: 12px; color: #047857; margin-top: 3px; line-height: 1.5;">
-                  La tendencia semanal (WoW: <strong>${lastWoWPct >= 0 ? '+' : ''}${lastWoWPct.toFixed(1)}%</strong>) acompaña de manera consistente la inercia del mes (MoM: <strong>${momPct >= 0 ? '+' : ''}${momPct.toFixed(1)}%</strong>). Divergencia calculada: <strong>${divergence.toFixed(1)} pts</strong> dentro del rango saludable.
+                  La tendencia semanal (WoW: <strong>${lastWoWPct >= 0 ? '+' : ''}${fmtDec(lastWoWPct, 2)}%</strong>) acompaña de manera consistente la inercia del mes (MoM: <strong>${momPct >= 0 ? '+' : ''}${fmtDec(momPct, 2)}%</strong>). Divergencia calculada: <strong>${fmtDec(divergence, 2)} pts</strong> dentro del rango saludable.
                 </p>
               </div>
             </div>
@@ -4056,9 +4211,9 @@
           if (idx === 0) {
             wowBadge = `<span style="font-size: 10px; color: #94a3b8; font-weight: 600;">(Semana Base)</span>`;
           } else if (w.deltaWoWAbs > 0) {
-            wowBadge = `<span style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 800; color: #10b981; background: #dcfce7; padding: 2px 6px; border-radius: 6px;">↑ +${w.deltaWoWPct.toFixed(1)}% (+${w.deltaWoWAbs.toLocaleString()})</span>`;
+            wowBadge = `<span style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 800; color: #10b981; background: #dcfce7; padding: 2px 6px; border-radius: 6px;">↑ +${fmtDec(w.deltaWoWPct, 2)}% (+${fmtInt(w.deltaWoWAbs)})</span>`;
           } else if (w.deltaWoWAbs < 0) {
-            wowBadge = `<span style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 800; color: #ef4444; background: #fee2e2; padding: 2px 6px; border-radius: 6px;">↓ ${w.deltaWoWPct.toFixed(1)}% (${w.deltaWoWAbs.toLocaleString()})</span>`;
+            wowBadge = `<span style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 800; color: #ef4444; background: #fee2e2; padding: 2px 6px; border-radius: 6px;">↓ ${fmtDec(w.deltaWoWPct, 2)}% (${fmtInt(w.deltaWoWAbs)})</span>`;
           } else {
             wowBadge = `<span style="font-size: 10px; color: #94a3b8; font-weight: 600;">➔ 0%</span>`;
           }
@@ -4066,9 +4221,9 @@
           let uArrow = '';
           if (idx > 0) {
             if (w.deltaUserAbs > 0) {
-              uArrow = `<span style="color: #10b981; font-weight: 800; font-size: 11px; margin-left: 3px;" title="Respuestas de usuarios aumentaron +${w.deltaUserAbs.toLocaleString()}">↑</span>`;
+              uArrow = `<span style="color: #10b981; font-weight: 800; font-size: 11px; margin-left: 3px;" title="Respuestas de usuarios aumentaron +${fmtInt(w.deltaUserAbs)}">↑</span>`;
             } else if (w.deltaUserAbs < 0) {
-              uArrow = `<span style="color: #ef4444; font-weight: 800; font-size: 11px; margin-left: 3px;" title="Respuestas de usuarios bajaron ${w.deltaUserAbs.toLocaleString()}">↓</span>`;
+              uArrow = `<span style="color: #ef4444; font-weight: 800; font-size: 11px; margin-left: 3px;" title="Respuestas de usuarios bajaron ${fmtInt(w.deltaUserAbs)}">↓</span>`;
             }
           }
 
@@ -4088,14 +4243,14 @@
           return `
             <tr>
               <td><strong>${escapeHtml(w.label || `Semana ${idx + 1}`)}</strong></td>
-              <td style="text-align: right; font-family: monospace; font-weight: 700;">${w.sessions.toLocaleString()}</td>
+              <td style="text-align: right; font-family: monospace; font-weight: 700;">${fmtInt(w.sessions)}</td>
               <td style="text-align: right; font-family: monospace; white-space: nowrap;">${wowBadge}</td>
-              <td style="text-align: right; font-family: monospace; font-weight: 700; color: #4f46e5;">${w.userMsgs.toLocaleString()}${uArrow}</td>
-              <td style="text-align: right; font-family: monospace; font-weight: 700; color: #f59e0b;">${w.agentMsgs.toLocaleString()}</td>
-              <td style="text-align: right; font-family: monospace; color: #a855f7;">${w.botMsgs.toLocaleString()}</td>
-              <td style="text-align: right; font-family: monospace; font-weight: 800;">${w.totalMsgs.toLocaleString()}</td>
+              <td style="text-align: right; font-family: monospace; font-weight: 700; color: #4f46e5;">${fmtInt(w.userMsgs)}${uArrow}</td>
+              <td style="text-align: right; font-family: monospace; font-weight: 700; color: #f59e0b;">${fmtInt(w.agentMsgs)}</td>
+              <td style="text-align: right; font-family: monospace; color: #a855f7;">${fmtInt(w.botMsgs)}</td>
+              <td style="text-align: right; font-family: monospace; font-weight: 800;">${fmtInt(w.totalMsgs)}</td>
               <td style="text-align: right; font-family: monospace; font-weight: 800; color: ${w.agentMsgs > 0 && (w.userMsgs / w.agentMsgs) < thresholds.minRatio ? '#ef4444' : '#10b981'};">
-                ${w.ratio}x
+                ${fmtDec(w.ratio, 2)}x
               </td>
               <td style="text-align: center;"><span style="font-size: 11px; font-weight: 700; color: ${diagColor};">${diag}</span></td>
             </tr>
@@ -4160,17 +4315,31 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: {
+            padding: {
+              top: 24,
+              bottom: 10,
+              left: 10,
+              right: 15
+            }
+          },
           interaction: { mode: 'index', intersect: false },
           scales: {
             x: { grid: { display: false } },
             y: {
               beginAtZero: true,
               grid: { color: 'rgba(0,0,0,0.05)' },
-              title: { display: true, text: 'Volumen Semanal', font: { size: 11, weight: 'bold' } }
+              title: { display: true, text: 'Volumen Semanal', font: { size: 11, weight: 'bold' } },
+              ticks: { callback: v => fmtInt(v) }
             }
           },
           plugins: {
-            legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11, weight: '600' } } }
+            legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11, weight: '600' } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` ${ctx.dataset.label}: ${fmtInt(ctx.parsed.y)}`
+              }
+            }
           }
         }
       });
@@ -4211,15 +4380,15 @@
             return `
               <tr class="${qTier.rowClass}" style="${isSelectedPeriod ? 'font-weight: bold;' : ''}">
                 <td><strong>📅 ${escapeHtml(h.report_date)}</strong> ${isSelectedPeriod ? '<span style="color:var(--primary); font-size:9px;">(Activo)</span>' : ''}</td>
-                <td style="text-align: right; font-family: monospace;">${Number(h.sessions || 0).toLocaleString()}</td>
+                <td style="text-align: right; font-family: monospace;">${fmtInt(h.sessions)}</td>
                 <td style="text-align: right; font-family: monospace; color: ${deltaPct >= 0 ? 'var(--success)' : 'var(--danger)'};">
-                  ${deltaPct >= 0 ? '↑ +' : '↓ '}${Math.abs(deltaPct)}% (${deltaAbs >= 0 ? '+' : ''}${deltaAbs.toLocaleString()})
+                  ${deltaPct >= 0 ? '↑ +' : '↓ '}${fmtDec(Math.abs(deltaPct), 2)}% (${deltaAbs >= 0 ? '+' : ''}${fmtInt(deltaAbs)})
                 </td>
-                <td style="text-align: right; font-family: monospace;">${Number(h.auto_ratio || 0).toFixed(0)}%</td>
-                <td style="text-align: right; font-family: monospace;">${Number(h.templates_sent || 0).toLocaleString()}</td>
-                <td style="text-align: right; font-family: monospace; font-weight: 700; color: #10b981;">${Number(h.templates_replies || 0).toLocaleString()}</td>
+                <td style="text-align: right; font-family: monospace;">${fmtPct(h.auto_ratio, 2)}</td>
+                <td style="text-align: right; font-family: monospace;">${fmtInt(h.templates_sent)}</td>
+                <td style="text-align: right; font-family: monospace; font-weight: 700; color: #10b981;">${fmtInt(h.templates_replies)}</td>
                 <td style="text-align: right; font-family: monospace; font-weight: 700; color: ${Number(h.reply_rate || 0) < 6 ? 'var(--danger)' : 'var(--success)'};">
-                  ${Number(h.reply_rate || 0).toFixed(1)}%
+                  ${fmtPct(h.reply_rate, 2)}
                 </td>
                 <td style="text-align: center;"><span class="badge ${qTier.badgeClass}" style="font-size: 10px; padding: 1px 6px;" title="${qTier.interpretation}">${qTier.label}</span></td>
               </tr>
@@ -4235,9 +4404,9 @@
             const a = Number(h.agent_msgs || 0);
             const b = Number(h.bot_msgs || 0);
             const tot = h.total_msgs !== undefined ? Number(h.total_msgs) : (u + a + b);
-            const uPct = tot > 0 ? (u / tot * 100).toFixed(0) : 0;
-            const aPct = tot > 0 ? (a / tot * 100).toFixed(0) : 0;
-            const ratio = a > 0 ? (u / a).toFixed(2) : (u > 0 ? '∞' : '0.00');
+            const uPct = tot > 0 ? (u / tot * 100) : 0;
+            const aPct = tot > 0 ? (a / tot * 100) : 0;
+            const ratio = a > 0 ? (u / a) : (u > 0 ? 999 : 0);
 
             const prevH = idx > 0 ? currentClientHistory[idx - 1] : null;
             const prevTot = prevH ? (prevH.total_msgs !== undefined ? Number(prevH.total_msgs) : (Number(prevH.user_msgs || 0) + Number(prevH.agent_msgs || 0) + Number(prevH.bot_msgs || 0))) : 0;
@@ -4255,9 +4424,9 @@
             if (idx === 0) {
               totBadge = `<span style="font-size: 10px; color: #94a3b8; font-weight: 600; margin-left: 4px;">(Base)</span>`;
             } else if (deltaTot > 0) {
-              totBadge = `<span style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 800; color: #10b981; background: #dcfce7; padding: 2px 6px; border-radius: 6px; margin-left: 5px;" title="Interacción subió +${deltaTot.toLocaleString()} msgs (+${deltaTotPct.toFixed(1)}%)">↑ +${deltaTotPct.toFixed(0)}%</span>`;
+              totBadge = `<span style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 800; color: #10b981; background: #dcfce7; padding: 2px 6px; border-radius: 6px; margin-left: 5px;" title="Interacción subió +${fmtInt(deltaTot)} msgs (+${fmtDec(deltaTotPct, 2)}%)">↑ +${fmtDec(deltaTotPct, 2)}%</span>`;
             } else if (deltaTot < 0) {
-              totBadge = `<span style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 800; color: #ef4444; background: #fee2e2; padding: 2px 6px; border-radius: 6px; margin-left: 5px;" title="Interacción bajó ${deltaTot.toLocaleString()} msgs (${deltaTotPct.toFixed(1)}%)">↓ ${deltaTotPct.toFixed(0)}%</span>`;
+              totBadge = `<span style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 800; color: #ef4444; background: #fee2e2; padding: 2px 6px; border-radius: 6px; margin-left: 5px;" title="Interacción bajó ${fmtInt(deltaTot)} msgs (${fmtDec(deltaTotPct, 2)}%)">↓ ${fmtDec(deltaTotPct, 2)}%</span>`;
             } else {
               totBadge = `<span style="font-size: 10px; color: #94a3b8; font-weight: 600; margin-left: 5px;">➔ 0%</span>`;
             }
@@ -4266,9 +4435,9 @@
             let uArrow = '';
             if (idx > 0) {
               if (deltaU > 0) {
-                uArrow = `<span style="color: #10b981; font-weight: 800; font-size: 11px; margin-left: 3px;" title="Respuestas de usuarios subieron +${deltaU.toLocaleString()}">↑</span>`;
+                uArrow = `<span style="color: #10b981; font-weight: 800; font-size: 11px; margin-left: 3px;" title="Respuestas de usuarios subieron +${fmtInt(deltaU)}">↑</span>`;
               } else if (deltaU < 0) {
-                uArrow = `<span style="color: #ef4444; font-weight: 800; font-size: 11px; margin-left: 3px;" title="Respuestas de usuarios bajaron ${deltaU.toLocaleString()}">↓</span>`;
+                uArrow = `<span style="color: #ef4444; font-weight: 800; font-size: 11px; margin-left: 3px;" title="Respuestas de usuarios bajaron ${fmtInt(deltaU)}">↓</span>`;
               }
             }
 
@@ -4300,15 +4469,15 @@
             return `
               <tr class="${qTier.rowClass}" style="${isSelectedPeriod ? 'font-weight: bold;' : ''}">
                 <td><strong>📅 ${escapeHtml(h.report_date)}</strong> ${isSelectedPeriod ? '<span style="color:var(--primary); font-size:9px;">(Activo)</span>' : ''}</td>
-                <td style="text-align: right; font-family: monospace;">${Number(h.sessions || 0).toLocaleString()}</td>
-                <td style="text-align: right; font-family: monospace; font-weight: 700; color: #4f46e5;">${u.toLocaleString()}${uArrow}</td>
-                <td style="text-align: right; font-family: monospace; font-weight: 700; color: #f59e0b;">${a.toLocaleString()}</td>
-                <td style="text-align: right; font-family: monospace; color: #a855f7;">${b.toLocaleString()}</td>
-                <td style="text-align: right; font-family: monospace; font-weight: 800; white-space: nowrap;">${tot.toLocaleString()}${totBadge}</td>
-                <td style="text-align: right; font-family: monospace; color: #4f46e5;">${uPct}%</td>
-                <td style="text-align: right; font-family: monospace; color: #f59e0b;">${aPct}%</td>
+                <td style="text-align: right; font-family: monospace;">${fmtInt(h.sessions)}</td>
+                <td style="text-align: right; font-family: monospace; font-weight: 700; color: #4f46e5;">${fmtInt(u)}${uArrow}</td>
+                <td style="text-align: right; font-family: monospace; font-weight: 700; color: #f59e0b;">${fmtInt(a)}</td>
+                <td style="text-align: right; font-family: monospace; color: #a855f7;">${fmtInt(b)}</td>
+                <td style="text-align: right; font-family: monospace; font-weight: 800; white-space: nowrap;">${fmtInt(tot)}${totBadge}</td>
+                <td style="text-align: right; font-family: monospace; color: #4f46e5;">${fmtPct(uPct, 2)}</td>
+                <td style="text-align: right; font-family: monospace; color: #f59e0b;">${fmtPct(aPct, 2)}</td>
                 <td style="text-align: right; font-family: monospace; font-weight: 800; color: ${a > 0 && (u / a) < 0.6 ? '#ef4444' : '#10b981'}; white-space: nowrap;">
-                  ${ratio}x${ratioArrow}
+                  ${a > 0 ? fmtDec(ratio, 2) : (u > 0 ? '∞' : '0,00')}x${ratioArrow}
                 </td>
                 <td style="text-align: center;"><span style="font-size: 11px; font-weight: 700; color: ${diagColor};">${diag}</span></td>
               </tr>
@@ -4322,7 +4491,7 @@
           const uTot = Number(latestH.user_msgs || 0);
           const aTot = Number(latestH.agent_msgs || 0);
           const bTot = Number(latestH.bot_msgs || 0);
-          const rVal = aTot > 0 ? (uTot / aTot).toFixed(2) : (uTot > 0 ? '∞' : '0.00');
+          const rVal = aTot > 0 ? (uTot / aTot) : (uTot > 0 ? 999 : 0);
 
           const elU = document.getElementById('modal-msg-stat-user');
           const elA = document.getElementById('modal-msg-stat-agent');
@@ -4330,11 +4499,11 @@
           const elR = document.getElementById('modal-msg-stat-ratio');
           const elRLbl = document.getElementById('modal-msg-stat-ratio-label');
 
-          if (elU) elU.textContent = uTot.toLocaleString();
-          if (elA) elA.textContent = aTot.toLocaleString();
-          if (elB) elB.textContent = bTot.toLocaleString();
+          if (elU) elU.textContent = fmtInt(uTot);
+          if (elA) elA.textContent = fmtInt(aTot);
+          if (elB) elB.textContent = fmtInt(bTot);
           if (elR) {
-            elR.textContent = `${rVal}x`;
+            elR.textContent = `${aTot > 0 ? fmtDec(rVal, 2) : (uTot > 0 ? '∞' : '0,00')}x`;
             elR.style.color = (aTot > 0 && uTot / aTot < 0.6) ? '#ef4444' : '#10b981';
           }
           if (elRLbl) {
@@ -4362,7 +4531,7 @@
       clientsData.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.id;
-        opt.textContent = `🏢 ${c.name} (${Number(c.sessions || 0).toLocaleString()} sesiones)`;
+        opt.textContent = `🏢 ${c.name} (${fmtInt(c.sessions)} sesiones)`;
         sel.appendChild(opt);
       });
       if (selectedId) sel.value = selectedId;
@@ -4415,10 +4584,10 @@
           <strong>Alertas del algoritmo:</strong><br>
           ${issues.map(i => `• ${escapeHtml(i)}`).join('<br>')}<br><br>
           <strong>Métricas Estructuradas de la Cuenta:</strong><br>
-          • Variación Sesiones WoW: <strong>${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%</strong> (${deltaAbs >= 0 ? '+' : ''}${deltaAbs.toLocaleString()} netas)<br>
-          • Participación en Cartera: <strong>${Number(client.portfolio_share_sessions || 0).toFixed(1)}%</strong> del tráfico global.<br>
-          • Automatización Bot: <strong>${Number(client.auto_ratio || 0).toFixed(1)}%</strong> (Mix: Bot ${Number(client.share_bot || 0).toFixed(0)}% | Humano ${Number(client.share_agent || 0).toFixed(0)}%).<br>
-          • Tasa de respuesta a plantillas: <strong>${Number(client.reply_rate || 0).toFixed(1)}%</strong> (Estándar de mercado: 6% - 15%).
+          • Variación Sesiones WoW: <strong>${deltaPct >= 0 ? '+' : ''}${fmtDec(deltaPct, 2)}%</strong> (${deltaAbs >= 0 ? '+' : ''}${fmtInt(deltaAbs)} netas)<br>
+          • Participación en Cartera: <strong>${fmtPct(client.portfolio_share_sessions, 2)}</strong> del tráfico global.<br>
+          • Automatización Bot: <strong>${fmtPct(client.auto_ratio, 2)}</strong> (Mix: Bot ${fmtPct(client.share_bot, 0)} | Humano ${fmtPct(client.share_agent, 0)}%).<br>
+          • Tasa de respuesta a plantillas: <strong>${fmtPct(client.reply_rate, 2)}</strong> (Estándar de mercado: 6,00% - 15,00%).
         `;
       }
 
@@ -4435,7 +4604,18 @@
               backgroundColor: ['#a855f7', '#10b981', '#6366f1']
             }]
           },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, font: { size: 10 } } } } }
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom', labels: { boxWidth: 8, font: { size: 10 } } },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => ` ${ctx.label}: ${fmtInt(ctx.parsed)} msgs`
+                }
+              }
+            }
+          }
         });
       }
 
@@ -4452,7 +4632,21 @@
               backgroundColor: ['#94a3b8', '#38bdf8', '#22c55e']
             }]
           },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: { ticks: { callback: v => fmtInt(v) }, grid: { color: '#f1f5f9' } }
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => ` ${ctx.label}: ${fmtInt(ctx.parsed.y)}`
+                }
+              }
+            }
+          }
         });
       }
 
