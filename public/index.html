@@ -438,6 +438,7 @@
       <button class="tab-btn active" data-tab="tab-fichas">📊 Fichas & KPIs de Cartera</button>
       <button class="tab-btn" data-tab="tab-matriz">📈 Análisis Vertical y Horizontal</button>
       <button class="tab-btn" data-tab="tab-graficas">📉 Gráficas de Tendencia & Cuadrantes</button>
+      <button class="tab-btn" id="tab-btn-nav-cliente" data-tab="tab-cliente">🏢 Ficha Integral de Cliente</button>
     </div>
 
     <!-- PESTAÑA 1: FICHAS & INGESTA -->
@@ -892,37 +893,52 @@
       </div>
     </div>
 
-    <!-- MODAL 2: DETALLE Y DIAGNÓSTICO INDIVIDUAL CLIENTE -->
-    <div id="client-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-      <div class="modal-content modal-content-wide">
-        <button class="close-btn" id="close-modal-btn" aria-label="Cerrar">✕</button>
-        
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 14px; margin-bottom: 16px;">
-          <div>
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <span id="modal-status-badge" class="badge" style="font-size: 12px; padding: 4px 10px;"></span>
-              <h2 id="modal-client-name" style="font-size: 22px; font-weight: 800; color: var(--text-main);"></h2>
+    <!-- PESTAÑA 4: FICHA TÉCNICA & DEEP-DIVE INTEGRAL DE CLIENTE (PANTALLA COMPLETA) -->
+    <div id="tab-cliente" class="tab-content hidden">
+      <!-- CABECERA DE CONTROL Y SELECTOR DE CLIENTE -->
+      <div class="card" style="margin-bottom: 20px; padding: 20px 24px; border-left: 4px solid var(--primary);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <label for="sel-active-client-tab" style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">
+                🏢 Seleccionar Cuenta / Cliente:
+              </label>
+              <select id="sel-active-client-tab" style="padding: 8px 14px; border: 1.5px solid #c7d2fe; border-radius: 8px; font-size: 13px; font-weight: 800; color: #3730a3; background: #eef2ff; outline: none; cursor: pointer; min-width: 270px;">
+                <!-- Poblado dinámicamente con los 35 clientes -->
+              </select>
             </div>
-            <p id="modal-client-meta" style="font-size: 13px; color: var(--text-muted); margin-top: 4px;"></p>
-          </div>
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <span id="modal-history-months-badge" style="font-size: 12px; font-weight: 700; background: #e0e7ff; color: #3730a3; padding: 4px 12px; border-radius: 12px;">Cargando historial...</span>
-            <button id="btn-delete-modal-client" class="btn btn-danger-outline" style="font-size: 11px; padding: 6px 12px;">🗑️ Eliminar Cliente</button>
-          </div>
-        </div>
 
-        <!-- SELECTOR DE PESTAÑAS DENTRO DEL MODAL -->
-        <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px;">
-          <button type="button" id="tab-btn-modal-templates" class="btn" style="background: var(--primary); color: white; font-weight: 700; font-size: 12px; padding: 7px 16px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-            📨 Outbound & Plantillas (WhatsApp)
-          </button>
-          <button type="button" id="tab-btn-modal-messages" class="btn" style="background: #f1f5f9; color: #64748b; font-weight: 600; font-size: 12px; padding: 7px 16px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-            💬 Interacción & Cantidades de Mensajes (Inbound / Agentes)
-          </button>
-          <button type="button" id="tab-btn-modal-weekly" class="btn" style="background: #f1f5f9; color: #64748b; font-weight: 600; font-size: 12px; padding: 7px 16px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-            📅 Desglose Semana a Semana (WoW) & Alerta Temprana
-          </button>
+            <div style="border-left: 2px solid var(--border); padding-left: 18px; display: flex; flex-direction: column; gap: 4px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="modal-status-badge" class="badge" style="font-size: 12px; padding: 4px 10px;"></span>
+                <h2 id="modal-client-name" style="font-size: 22px; font-weight: 800; color: var(--text-main); margin: 0;"></h2>
+              </div>
+              <p id="modal-client-meta" style="font-size: 12px; color: var(--text-muted); margin: 0;"></p>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <span id="modal-history-months-badge" style="font-size: 12px; font-weight: 700; background: #e0e7ff; color: #3730a3; padding: 6px 14px; border-radius: 12px;">Cargando historial...</span>
+            <button id="btn-delete-modal-client" class="btn btn-danger-outline" style="font-size: 11px; padding: 7px 12px;">🗑️ Eliminar Cliente</button>
+          </div>
         </div>
+      </div>
+
+      <!-- SELECTOR DE SUBPESTAÑAS DE LA FICHA DE CLIENTE -->
+      <div class="subtab-bar" style="margin-bottom: 20px;">
+        <button type="button" id="tab-btn-modal-templates" class="subtab-btn active" style="font-size: 12px; padding: 8px 16px;">
+          📨 1. Outbound & Plantillas (WhatsApp)
+        </button>
+        <button type="button" id="tab-btn-modal-messages" class="subtab-btn" style="font-size: 12px; padding: 8px 16px;">
+          💬 2. Interacción & Carga de Mensajes (Inbound / Agentes)
+        </button>
+        <button type="button" id="tab-btn-modal-weekly" class="subtab-btn" style="font-size: 12px; padding: 8px 16px;">
+          📅 3. Desglose Semana a Semana (WoW) & Alerta Temprana
+        </button>
+        <button type="button" id="tab-btn-modal-operational" class="subtab-btn" style="font-size: 12px; padding: 8px 16px;">
+          🧠 4. Diagnóstico Algorítmico & Funnel Operativo
+        </button>
+      </div>
 
         <!-- PESTAÑA 1 MODAL: EVOLUCIÓN HISTÓRICA PLANTILLAS (MoM) -->
         <div id="modal-tab-content-templates">
@@ -1133,24 +1149,27 @@
           </div>
         </div>
 
-        <!-- SECCIÓN INFERIOR: DIAGNÓSTICO Y DESGLOSE OPERATIVO -->
-        <div class="modal-bottom-grid">
-          <div style="background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 10px; padding: 16px;">
-            <h4 style="font-size: 12px; font-weight: 800; color: #3730a3; margin-bottom: 6px;">🧠 Diagnóstico del Algoritmo:</h4>
-            <div id="modal-diagnostic-text" style="font-size: 12px; color: #1e1b4b; line-height: 1.6;"></div>
+      <!-- SUBPESTAÑA 4: DIAGNÓSTICO ALGORÍTMICO & FUNNEL OPERATIVO -->
+      <div id="modal-tab-content-operational" class="hidden">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+          <div style="background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 14px; padding: 22px;">
+            <h4 style="font-size: 14px; font-weight: 800; color: #3730a3; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              🧠 Diagnóstico del Algoritmo Predictivo:
+            </h4>
+            <div id="modal-diagnostic-text" style="font-size: 13px; color: #1e1b4b; line-height: 1.7;"></div>
           </div>
 
-          <div class="modal-charts-grid" style="margin: 0; gap: 12px;">
-            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 12px;">
-              <h4 style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">Distribución de Mensajes</h4>
-              <div style="height: 160px; position: relative;">
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="card" style="padding: 18px;">
+              <h4 style="font-size: 12px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 10px;">Distribución de Mensajes</h4>
+              <div style="height: 200px; position: relative;">
                 <canvas id="clientDoughnutChart"></canvas>
               </div>
             </div>
 
-            <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 12px;">
-              <h4 style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">Funnel Outbound Mes Activo</h4>
-              <div style="height: 160px; position: relative;">
+            <div class="card" style="padding: 18px;">
+              <h4 style="font-size: 12px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 10px;">Funnel Outbound Mes Activo</h4>
+              <div style="height: 200px; position: relative;">
                 <canvas id="clientTemplatesBarChart"></canvas>
               </div>
             </div>
@@ -1520,6 +1539,13 @@
           } else if (btn.dataset.tab === 'tab-matriz') {
             renderMatrix();
             populateSingleClientDropdown();
+          } else if (btn.dataset.tab === 'tab-cliente') {
+            if (!selectedClientForModal && clientsData.length > 0) {
+              selectedClientForModal = clientsData[0];
+            }
+            if (selectedClientForModal) {
+              openClientTab(selectedClientForModal);
+            }
           }
         }
       };
@@ -4329,23 +4355,46 @@
       }
     }
 
-    // MODAL DETALLE
-    function openClientModal(client) {
+    function populateClientTabSelector(selectedId = null) {
+      const sel = document.getElementById('sel-active-client-tab');
+      if (!sel) return;
+      sel.innerHTML = '';
+      clientsData.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `🏢 ${c.name} (${Number(c.sessions || 0).toLocaleString()} sesiones)`;
+        sel.appendChild(opt);
+      });
+      if (selectedId) sel.value = selectedId;
+    }
+
+    // NAVEGACIÓN Y CARGA DE LA FICHA INTEGRAL DE CLIENTE (FULL-WIDTH)
+    function openClientTab(clientOrId) {
+      let client = null;
+      if (typeof clientOrId === 'string') {
+        client = clientsData.find(c => c.id === clientOrId);
+      } else {
+        client = clientOrId;
+      }
+      if (!client && clientsData.length > 0) {
+        client = clientsData[0];
+      }
       if (!client) return;
+
       selectedClientForModal = client;
 
-      // Reset a Pestaña 1 por defecto
-      currentModalTab = 'templates';
-      const bT = document.getElementById('tab-btn-modal-templates');
-      const bM = document.getElementById('tab-btn-modal-messages');
-      const bW = document.getElementById('tab-btn-modal-weekly');
-      if (bT) { bT.style.background = 'var(--primary)'; bT.style.color = '#fff'; }
-      if (bM) { bM.style.background = '#f1f5f9'; bM.style.color = '#64748b'; }
-      if (bW) { bW.style.background = '#f1f5f9'; bW.style.color = '#64748b'; }
-      document.getElementById('modal-tab-content-templates')?.classList.remove('hidden');
-      document.getElementById('modal-tab-content-messages')?.classList.add('hidden');
-      document.getElementById('modal-tab-content-weekly')?.classList.add('hidden');
+      // Activar pestaña principal en la barra superior
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+      const navBtn = document.getElementById('tab-btn-nav-cliente');
+      if (navBtn) navBtn.classList.add('active');
+      const tabEl = document.getElementById('tab-cliente');
+      if (tabEl) tabEl.classList.remove('hidden');
 
+      // Actualizar selector de clientes
+      populateClientTabSelector(client.id);
+
+      // Renderizar datos del cliente
       document.getElementById('modal-client-name').textContent = client.name || 'Sin Nombre';
       document.getElementById('modal-client-meta').textContent = `${client.industry || 'General'} • Web: ${client.website || 'sin-web.com'} • Período: ${client.report_date || 'Reciente'}`;
 
@@ -4410,24 +4459,21 @@
       // Cargar evolución histórica y gráfico MoM
       loadClientHistoryTrend(client.id);
 
-      document.getElementById('client-modal')?.classList.remove('hidden');
+      // Activar subpestaña actual
+      setModalTab(currentModalTab || 'templates');
     }
 
-    document.getElementById('close-modal-btn').onclick = () => {
-      document.getElementById('client-modal')?.classList.add('hidden');
-      selectedClientForModal = null;
-    };
-    document.getElementById('client-modal').onclick = (e) => {
-      if (e.target.id === 'client-modal') {
-        document.getElementById('client-modal')?.classList.add('hidden');
-        selectedClientForModal = null;
-      }
-    };
+    // Alias retrocompatible
+    function openClientModal(client) {
+      openClientTab(client);
+    }
+
     document.getElementById('btn-delete-modal-client').onclick = async () => {
       if (selectedClientForModal) {
         await deleteClientById(selectedClientForModal.id, selectedClientForModal.name);
-        document.getElementById('client-modal')?.classList.add('hidden');
         selectedClientForModal = null;
+        const firstTab = document.querySelector('.tab-btn[data-tab="tab-fichas"]');
+        if (firstTab) firstTab.click();
       }
     };
 
@@ -4534,33 +4580,55 @@
       renderHistoryChart();
     });
 
-    // Control Unificado de Pestañas dentro del Modal (Plantillas vs Mensajes vs Semanal)
+    // Control Unificado de Subpestañas dentro de la Ficha Técnica (Plantillas vs Mensajes vs Semanal vs Operativo)
     function setModalTab(tabName) {
       currentModalTab = tabName;
       const bT = document.getElementById('tab-btn-modal-templates');
       const bM = document.getElementById('tab-btn-modal-messages');
       const bW = document.getElementById('tab-btn-modal-weekly');
+      const bO = document.getElementById('tab-btn-modal-operational');
 
-      if (bT) { bT.style.background = tabName === 'templates' ? 'var(--primary)' : '#f1f5f9'; bT.style.color = tabName === 'templates' ? '#fff' : '#64748b'; }
-      if (bM) { bM.style.background = tabName === 'messages' ? 'var(--primary)' : '#f1f5f9'; bM.style.color = tabName === 'messages' ? '#fff' : '#64748b'; }
-      if (bW) { bW.style.background = tabName === 'weekly' ? 'var(--primary)' : '#f1f5f9'; bW.style.color = tabName === 'weekly' ? '#fff' : '#64748b'; }
+      if (bT) bT.classList.toggle('active', tabName === 'templates');
+      if (bM) bM.classList.toggle('active', tabName === 'messages');
+      if (bW) bW.classList.toggle('active', tabName === 'weekly');
+      if (bO) bO.classList.toggle('active', tabName === 'operational');
 
       const cT = document.getElementById('modal-tab-content-templates');
       const cM = document.getElementById('modal-tab-content-messages');
       const cW = document.getElementById('modal-tab-content-weekly');
+      const cO = document.getElementById('modal-tab-content-operational');
 
       if (cT) cT.classList.toggle('hidden', tabName !== 'templates');
       if (cM) cM.classList.toggle('hidden', tabName !== 'messages');
       if (cW) cW.classList.toggle('hidden', tabName !== 'weekly');
+      if (cO) cO.classList.toggle('hidden', tabName !== 'operational');
 
-      if (tabName === 'templates') renderHistoryChart();
-      else if (tabName === 'messages') renderMessagesHistoryChart();
-      else if (tabName === 'weekly') renderWeeklyTab();
+      if (tabName === 'templates') {
+        renderHistoryChart();
+      } else if (tabName === 'messages') {
+        renderMessagesHistoryChart();
+      } else if (tabName === 'weekly') {
+        renderWeeklyTab();
+      } else if (tabName === 'operational') {
+        requestAnimationFrame(() => {
+          if (modalDoughnutInstance) modalDoughnutInstance.resize();
+          if (modalBarInstance) modalBarInstance.resize();
+        });
+      }
     }
 
     document.getElementById('tab-btn-modal-templates')?.addEventListener('click', () => setModalTab('templates'));
     document.getElementById('tab-btn-modal-messages')?.addEventListener('click', () => setModalTab('messages'));
     document.getElementById('tab-btn-modal-weekly')?.addEventListener('click', () => setModalTab('weekly'));
+    document.getElementById('tab-btn-modal-operational')?.addEventListener('click', () => setModalTab('operational'));
+
+    // Selector de Cliente dentro de la Ficha Técnica
+    document.getElementById('sel-active-client-tab')?.addEventListener('change', (e) => {
+      const c = clientsData.find(cl => cl.id === e.target.value);
+      if (c) {
+        openClientTab(c);
+      }
+    });
 
     // Eventos del Modal de Configuración de SLAs / Umbrales
     document.getElementById('btn-open-config')?.addEventListener('click', openConfigModal);
