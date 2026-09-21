@@ -69,6 +69,7 @@ class IngestClientItem(BaseModel):
     templates_delivered: int = 0
     templates_replies: int = 0
     report_date: Optional[str] = None
+    weekly_data: Optional[str] = "[]"
 
 class MergeClientsRequest(BaseModel):
     source_id: str
@@ -78,6 +79,13 @@ class MergeClientsRequest(BaseModel):
 def ensure_tables():
     try:
         Base.metadata.create_all(bind=engine)
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("ALTER TABLE weekly_metrics ADD COLUMN weekly_data TEXT DEFAULT '[]';"))
+                conn.commit()
+            except Exception:
+                pass
     except Exception as e:
         print(f"Warning ensuring tables: {e}")
 

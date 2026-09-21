@@ -138,6 +138,12 @@ def upsert_client_and_metric(db: Session, data: dict, report_date: date = None):
     metric.templates_delivered = templates_delivered
     metric.templates_replies = templates_replies
 
+    weekly_data = data.get("weekly_data", "[]")
+    if isinstance(weekly_data, list):
+        weekly_data = json.dumps(weekly_data, ensure_ascii=False)
+    elif not isinstance(weekly_data, str):
+        weekly_data = "[]"
+
     metric.auto_ratio = health["auto_ratio"]
     metric.delivery_rate = health["delivery_rate"]
     metric.reply_rate = health["reply_rate"]
@@ -145,6 +151,10 @@ def upsert_client_and_metric(db: Session, data: dict, report_date: date = None):
     metric.churn_score = health["churn_score"]
     metric.status = health["status"]
     metric.issues = json.dumps(health["issues"], ensure_ascii=False)
+    try:
+        metric.weekly_data = weekly_data
+    except Exception:
+        pass
 
     db.commit()
     db.refresh(client)
@@ -442,7 +452,8 @@ def get_client_history(db: Session, client_id: str):
             "mom_reply_pct": round(mom_reply_pct, 1),
             "status": m.status,
             "churn_score": m.churn_score,
-            "issues": json.loads(m.issues) if m.issues else []
+            "issues": json.loads(m.issues) if m.issues else [],
+            "weekly_data": json.loads(m.weekly_data) if getattr(m, "weekly_data", None) and m.weekly_data else []
         })
 
     return {
@@ -524,6 +535,23 @@ def compute_smart_alerts(db: Session):
                     "title": f"Sobrecarga de Agentes Humanos ({human_share:.0f}%)",
                     "detail": f"Los agentes humanos están absorbiendo el {human_share:.0f}% del diálogo. El bot solo resuelve el {latest.auto_ratio:.0f}%.",
                     "action": "Revisar motivos de derivación y entrenar intenciones frecuentes en Botmaker para aumentar contención."
+                })
+
+        # Alerta 4: Alerta Temprana por Divergencia MoM vs WoW (Desaceleración o Colapso Oculto)
+        if prev and prev.sessions > 0 and latest.prev_sessions > 0:
+            mom_pct = ((latest.sessions - prev.sessions) / prev.sessions) * 100.0
+            wow_pct = ((latest.sessions - latest.prev_sessions) / latest.prev_sessions) * 100.0
+            divergence = mom_pct - wow_pct
+            if divergence >= 20.0 or (mom_pct > -5.0 and wow_pct <= -15.0):
+                alerts.append({
+                    "id": f"alert-early-warning-{c.id}-{latest.report_date}",
+                    "level": "critical" if divergence >= 30.0 else "warning",
+                    "client_id": c.id,
+                    "client_name": c.name,
+                    "period": str(latest.report_date),
+                    "title": f"⚡ Alerta Temprana: Desaceleración Oculta (Divergencia MoM - WoW: +{divergence:.1f}%)",
+                    "detail": f"El mes aparenta estabilidad acumulada ({mom_pct:+.1f}% MoM), pero la velocidad de la última semana se contrajo bruscamente ({wow_pct:+.1f}% WoW). La brecha de {divergence:.1f}% indica una pérdida acelerada de interacción antes del cierre del período.",
+                    "action": "Auditar inmediatamente la última semana de atención, verificar si hubo caídas técnicas en la línea de WhatsApp o indisponibilidad de asesores."
                 })
 
     return alerts

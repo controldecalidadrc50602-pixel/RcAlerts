@@ -40,6 +40,7 @@ class WeeklyMetric(Base):
     churn_score = Column(Float, default=100.0)
     status = Column(String(20), default="green") # 'red', 'yellow', 'green'
     issues = Column(Text, default="[]") # JSON en texto con las alertas
+    weekly_data = Column(Text, default="[]") # JSON con desglose semana a semana (WoW)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
