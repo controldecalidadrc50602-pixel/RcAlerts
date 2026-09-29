@@ -120,6 +120,86 @@ def get_alerts_endpoint(db: Session = Depends(get_db)):
     except Exception as e:
         return []
 
+WORKSPACE_STUDIO_WEBHOOK_URL = os.getenv(
+    "WORKSPACE_STUDIO_WEBHOOK_URL",
+    "https://script.google.com/macros/s/AKfycbz9qx8GFTBqz-ykIzVdF4uVN3jKVyBdBOYAlpfLMwfb7RfpTvZwQo1D-vrVKbgA8g73/exec"
+)
+
+@app.post("/api/alerts/sync-workspace")
+@app.post("/alerts/sync-workspace")
+def sync_alerts_to_workspace(db: Session = Depends(get_db)):
+    """
+    Sincroniza las alertas inteligentes y clientes óptimos hacia Google Workspace Studio
+    vía Webhook de Google Apps Script.
+    """
+    import urllib.request
+    import json
+    try:
+        ensure_tables()
+        alerts = crud.compute_smart_alerts(db)
+        clients = crud.get_clients_with_latest_metric(db)
+        
+        records = []
+        for a in alerts:
+            level_str = "ROJO" if a.get("level") == "critical" else "AMARILLO"
+            c_data = next((c for c in clients if c["id"] == a.get("client_id")), None)
+            sessions_fmt = f"{c_data['sessions']:,}".replace(",", ".") if c_data else "0"
+            mom_fmt = f"{c_data.get('delta_pct', 0):+.2f}%".replace(".", ",") if c_data else "0,00%"
+            auto_fmt = f"{c_data.get('auto_ratio', 0):.2f}%".replace(".", ",") if c_data else "0,00%"
+            reply_fmt = f"{c_data.get('reply_rate', 0):.2f}%".replace(".", ",") if c_data else "0,00%"
+            
+            records.append({
+                "client_id": a.get("client_id"),
+                "client_name": a.get("client_name"),
+                "period": a.get("period", "2026-09"),
+                "semaforo": level_str,
+                "diagnostico": f"{a.get('title')}: {a.get('detail')}",
+                "sesiones": sessions_fmt,
+                "variacion_mom": mom_fmt,
+                "tasa_automatizacion": auto_fmt,
+                "tasa_respuesta_outbound": reply_fmt,
+                "accion_recomendada": a.get("action", "Auditar cliente y revisar SLA"),
+                "enlace_dashboard": f"https://rc-alerts.vercel.app/?client={a.get('client_id')}"
+            })
+            
+        alert_client_ids = {a.get("client_id") for a in alerts}
+        for c in clients:
+            if c["id"] not in alert_client_ids and c.get("auto_ratio", 0) >= 65 and c.get("delta_pct", 0) >= 0:
+                sessions_fmt = f"{c['sessions']:,}".replace(",", ".")
+                mom_fmt = f"{c.get('delta_pct', 0):+.2f}%".replace(".", ",")
+                auto_fmt = f"{c.get('auto_ratio', 0):.2f}%".replace(".", ",")
+                reply_fmt = f"{c.get('reply_rate', 0):.2f}%".replace(".", ",")
+                
+                records.append({
+                    "client_id": c["id"],
+                    "client_name": c["name"],
+                    "period": c.get("report_date", "2026-09"),
+                    "semaforo": "VERDE",
+                    "diagnostico": f"Rendimiento sobresaliente. Crecimiento de {mom_fmt} y contención de bot del {auto_fmt}.",
+                    "sesiones": sessions_fmt,
+                    "variacion_mom": mom_fmt,
+                    "tasa_automatizacion": auto_fmt,
+                    "tasa_respuesta_outbound": reply_fmt,
+                    "accion_recomendada": "Enviar felicitación por optimización continua de canales y agendamiento.",
+                    "enlace_dashboard": f"https://rc-alerts.vercel.app/?client={c['id']}"
+                })
+                
+        if not records:
+            return {"status": "ok", "message": "No hay alertas registradas para sincronizar", "count": 0}
+            
+        req = urllib.request.Request(
+            WORKSPACE_STUDIO_WEBHOOK_URL,
+            data=json.dumps(records).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=12) as response:
+            resp_data = response.read().decode("utf-8")
+            return {"status": "success", "message": f"{len(records)} alertas enviadas a Google Workspace Studio", "count": len(records), "webhook_response": resp_data}
+            
+    except Exception as e:
+        return {"status": "error", "message": f"Error al sincronizar con Google Workspace: {str(e)}"}
+
 # Rutas API (Dual Decorator para compatibilidad local y Vercel rewrites)
 @app.get("/api/clients")
 @app.get("/clients")

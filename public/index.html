@@ -391,6 +391,11 @@
         🔔 Alertas <span id="badge-alerts-count" style="background: #e11d48; color: white; border-radius: 10px; padding: 1px 6px; font-size: 10px; font-weight: 800; margin-left: 2px;">0</span>
       </button>
 
+      <!-- BOTÓN SINCRONIZAR CON GOOGLE WORKSPACE STUDIO -->
+      <button id="btn-header-sync-workspace" class="btn btn-default" style="font-weight: 700; color: #0f9d58; border-color: #a7f3d0;" title="Sincronizar alertas con Google Workspace Studio y Google Chat">
+        ⚡ Workspace Studio
+      </button>
+
       <button id="btn-clear-db" class="btn btn-danger-outline" title="Vaciar base de datos para comenzar en blanco">🗑️ Limpiar Cartera</button>
       <button id="btn-load-demo" class="btn btn-default">✨ Cargar 5 Clientes Demo</button>
       <button id="btn-export-md" class="btn btn-primary">📄 Exportar NotebookLM (.MD)</button>
@@ -1182,12 +1187,17 @@
     <div id="alerts-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
       <div class="modal-content" style="max-width: 680px;">
         <button class="close-btn" id="close-alerts-modal-btn" aria-label="Cerrar">✕</button>
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
-          <div style="width: 38px; height: 38px; border-radius: 10px; background: #ffe4e6; color: #e11d48; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold;">🚨</div>
-          <div>
-            <h2 style="font-size: 17px; font-weight: 800; color: var(--text-main);">Centro de Alertas & Detección de Anomalías</h2>
-            <p style="font-size: 12px; color: var(--text-muted);">Monitoreo automático de variaciones críticas mes a mes (MoM)</p>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 38px; height: 38px; border-radius: 10px; background: #ffe4e6; color: #e11d48; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold;">🚨</div>
+            <div>
+              <h2 style="font-size: 17px; font-weight: 800; color: var(--text-main);">Centro de Alertas & Detección de Anomalías</h2>
+              <p style="font-size: 12px; color: var(--text-muted);">Monitoreo automático de variaciones críticas mes a mes (MoM)</p>
+            </div>
           </div>
+          <button id="btn-sync-workspace-modal" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 7px 12px; background: #0f9d58; border-color: #0f9d58; color: white;" title="Enviar alertas actuales hacia Google Sheets y activar Google Workspace Studio">
+            <span>⚡ Sincronizar con Google Workspace</span>
+          </button>
         </div>
         <div id="alerts-list-container" style="max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 0;">
           <!-- Generado dinámicamente -->
@@ -1711,6 +1721,72 @@
           </div>
         </div>
       `).join('');
+    }
+
+    async function syncWorkspaceStudioAlerts() {
+      const btnHeader = document.getElementById('btn-header-sync-workspace');
+      const btnModal = document.getElementById('btn-sync-workspace-modal');
+      const setBtnLoading = (loading) => {
+        if (btnHeader) {
+          btnHeader.disabled = loading;
+          btnHeader.innerHTML = loading ? '<span>⏳ Sincronizando...</span>' : '<span>⚡ Workspace Studio</span>';
+        }
+        if (btnModal) {
+          btnModal.disabled = loading;
+          btnModal.innerHTML = loading ? '<span>⏳ Sincronizando con Google...</span>' : '<span>⚡ Sincronizar con Google Workspace</span>';
+        }
+      };
+
+      setBtnLoading(true);
+      showToast('⏳ Sincronizando alertas con Google Workspace Studio y Google Chat...');
+
+      try {
+        const res = await fetch('/api/alerts/sync-workspace', { method: 'POST' });
+        const result = await res.json();
+        
+        if (result.status === 'success') {
+          showToast(`✅ ¡${result.count} alertas enviadas a Google Workspace Studio y Google Chat!`);
+        } else if (result.status === 'ok') {
+          showToast(`ℹ️ ${result.message}`);
+        } else {
+          showToast(`⚠️ ${result.message || 'Error en la sincronización'}`);
+        }
+      } catch (err) {
+        console.warn('Fallback despacho directo hacia webhook:', err);
+        try {
+          const directUrl = 'https://script.google.com/macros/s/AKfycbz9qx8GFTBqz-ykIzVdF4uVN3jKVyBdBOYAlpfLMwfb7RfpTvZwQo1D-vrVKbgA8g73/exec';
+          const records = (currentAlerts || []).map(a => ({
+            client_id: a.client_id,
+            client_name: a.client_name,
+            period: a.period || '2026-09',
+            semaforo: a.level === 'critical' ? 'ROJO' : 'AMARILLO',
+            diagnostico: `${a.title}: ${a.detail}`,
+            sesiones: '0',
+            variacion_mom: '0,00%',
+            tasa_automatizacion: '0,00%',
+            tasa_respuesta_outbound: '0,00%',
+            accion_recomendada: a.action || 'Revisar en dashboard',
+            enlace_dashboard: `https://rc-alerts.vercel.app/?client=${a.client_id}`
+          }));
+
+          if (!records.length) {
+            showToast('ℹ️ No hay alertas pendientes para sincronizar.');
+            return;
+          }
+
+          await fetch(directUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(records)
+          });
+          showToast(`✅ ${records.length} alertas registradas en Google Sheet para Workspace Studio.`);
+        } catch (fallbackErr) {
+          showToast('❌ Error de conexión al sincronizar con Google Workspace.');
+        }
+      } finally {
+        setBtnLoading(false);
+      }
     }
 
     function renderSidebar() {
@@ -4760,6 +4836,11 @@
     document.getElementById('alerts-modal')?.addEventListener('click', (e) => {
       if (e.target.id === 'alerts-modal') closeAlertsModal();
     });
+
+    // Sincronización Directa hacia Google Workspace Studio
+    document.getElementById('btn-header-sync-workspace')?.addEventListener('click', syncWorkspaceStudioAlerts);
+    document.getElementById('btn-sync-workspace-modal')?.addEventListener('click', syncWorkspaceStudioAlerts);
+
     // Selectores de Modo para la Gráfica de Historial de Plantillas (Cantidad Real vs % Tasa)
     document.getElementById('btn-chart-mode-replies-count')?.addEventListener('click', () => {
       currentHistoryChartMode = 'replies-count';
