@@ -9,7 +9,9 @@ def sanitize_db_url(url: str) -> str:
     if not url or url.startswith("sqlite"):
         return url
     if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
+        url = url.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
+        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
         
     # Auto-conmutación de conexión directa IPv6 a Pooler IPv4 resiliente en Vercel
     match = re.search(r'@db\.([a-z0-9]+)\.supabase\.co(?::5432)?', url)
