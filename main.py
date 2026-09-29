@@ -94,15 +94,21 @@ def ensure_tables():
 @app.get("/api/health-db")
 @app.get("/health-db")
 def health_db(db: Session = Depends(get_db)):
-    from backend.database import DATABASE_URL
+    from backend.database import DATABASE_URL, REMOTE_DB_ERROR
     from sqlalchemy import text
     try:
         ensure_tables()
         res = db.execute(text("SELECT 1;")).fetchone()
         masked = DATABASE_URL.split("@")[-1] if "@" in DATABASE_URL else DATABASE_URL
-        return {"status": "ok", "db_connected": True, "target": masked, "test_query": res[0]}
+        return {
+            "status": "ok",
+            "db_connected": True,
+            "target": masked,
+            "test_query": res[0],
+            "remote_db_error": REMOTE_DB_ERROR
+        }
     except Exception as e:
-        return {"status": "error", "db_connected": False, "error": str(e)}
+        return {"status": "error", "db_connected": False, "error": str(e), "remote_db_error": REMOTE_DB_ERROR}
 
 @app.get("/api/periods")
 @app.get("/periods")
@@ -217,19 +223,48 @@ def get_clients(period: Optional[str] = None, seed_demo: bool = False, db: Sessi
             print(f"Database error in get_clients: {err2}")
             return []
 
+@app.get("/api/clients/{client_id}")
+@app.get("/clients/{client_id}")
+def get_single_client_endpoint(client_id: str, db: Session = Depends(get_db)):
+    try:
+        ensure_tables()
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            return {"id": client_id, "name": client_id, "status": "inexistente", "sessions": 0}
+        latest = client.metrics[0] if client.metrics else None
+        return {
+            "id": client.id,
+            "name": client.name,
+            "website": client.website,
+            "industry": client.industry,
+            "focus": client.focus,
+            "sessions": latest.sessions if latest else 0,
+            "user_msgs": latest.user_msgs if latest else 0,
+            "bot_msgs": latest.bot_msgs if latest else 0,
+            "agent_msgs": latest.agent_msgs if latest else 0,
+            "templates_sent": latest.templates_sent if latest else 0,
+            "templates_delivered": latest.templates_delivered if latest else 0,
+            "templates_replies": latest.templates_replies if latest else 0,
+            "auto_ratio": latest.auto_ratio if latest else 0,
+            "delivery_rate": latest.delivery_rate if latest else 0,
+            "reply_rate": latest.reply_rate if latest else 0,
+            "churn_score": latest.churn_score if latest else 100,
+            "status": latest.status if latest else "green"
+        }
+    except Exception as e:
+        return {"id": client_id, "name": client_id, "error": str(e)}
+
 @app.get("/api/clients/{client_id}/history")
 @app.get("/clients/{client_id}/history")
 def get_client_history_endpoint(client_id: str, db: Session = Depends(get_db)):
     try:
         ensure_tables()
         history = crud.get_client_history(db, client_id)
-        if not history:
-            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        if not history or not history.get("history"):
+            return {"client": {"id": client_id, "name": client_id}, "history": []}
         return history
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"client": {"id": client_id, "name": client_id}, "history": [], "error": str(e)}
 
 @app.get("/api/portfolio/history")
 @app.get("/portfolio/history")

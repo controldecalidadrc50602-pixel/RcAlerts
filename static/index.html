@@ -2537,8 +2537,7 @@
 
       try {
         const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}/history`);
-        if (!res.ok) throw new Error("Error obteniendo historial");
-        const resData = await res.json();
+        const resData = res.ok ? await res.json() : { client: { id: clientId, name: clientId }, history: [] };
         const history = Array.isArray(resData) ? resData : (resData.history || []);
         const clientInfo = resData.client || {};
 
@@ -4432,8 +4431,7 @@
 
       try {
         const res = await fetch(`/api/clients/${clientId}/history`);
-        if (!res.ok) throw new Error("No se pudo cargar historial");
-        const data = await res.json();
+        const data = res.ok ? await res.json() : { client: { id: clientId, name: clientId }, history: [] };
         currentClientHistory = data.history || [];
 
         if (badgeEl) {

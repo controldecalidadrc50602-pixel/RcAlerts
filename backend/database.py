@@ -58,6 +58,8 @@ def build_engine(url: str):
         connect_args=connect_args
     )
 
+REMOTE_DB_ERROR = None
+
 try:
     engine = build_engine(DATABASE_URL)
     # Si es PostgreSQL, verificar conectividad rápida con timeout estricto para no colgar Vercel
@@ -66,6 +68,7 @@ try:
         with engine.connect() as test_conn:
             test_conn.execute(text("SELECT 1;"))
 except Exception as db_err:
+    REMOTE_DB_ERROR = str(db_err)
     print(f"AVISO RESILIENCIA: Base de datos remota inaccesible ({db_err}). Conmutando automáticamente a base local de respaldo.")
     DATABASE_URL = default_db
     engine = build_engine(DATABASE_URL)
