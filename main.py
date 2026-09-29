@@ -12,11 +12,7 @@ from backend.database import engine, Base, get_db
 from backend.models import Client
 from backend import crud
 
-# Crear tablas automáticamente al iniciar (SQLite local o Postgres Supabase)
-try:
-    Base.metadata.create_all(bind=engine)
-except Exception as e:
-    print(f"Non-blocking DB initialization warning: {e}")
+# Inicialización diferida de tablas en ensure_tables() para evitar bloqueos en cold start
 
 app = FastAPI(
     title="OmniPulse Intelligence Hub API",
@@ -76,7 +72,12 @@ class MergeClientsRequest(BaseModel):
     target_id: str
 
 
+_tables_initialized = False
+
 def ensure_tables():
+    global _tables_initialized
+    if _tables_initialized:
+        return
     try:
         Base.metadata.create_all(bind=engine)
         from sqlalchemy import text
@@ -86,6 +87,7 @@ def ensure_tables():
                 conn.commit()
             except Exception:
                 pass
+        _tables_initialized = True
     except Exception as e:
         print(f"Warning ensuring tables: {e}")
 

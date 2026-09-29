@@ -36,25 +36,41 @@ is_serverless = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"
 default_db = "sqlite:////tmp/omnipulse.db" if is_serverless else "sqlite:///./omnipulse.db"
 
 # Si no hay variable DATABASE_URL, usa SQLite en ./ o /tmp. Con PostgreSQL (Supabase) usa el pooler.
-DATABASE_URL = sanitize_db_url(os.getenv("DATABASE_URL", default_db))
+configured_url = os.getenv("DATABASE_URL")
+DATABASE_URL = sanitize_db_url(configured_url) if configured_url else default_db
 
-# Ajuste para compatibilidad con SQLite (hilos) y URLs de postgresql://
-if DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-else:
-    connect_args = {}
-    if "supabase" in DATABASE_URL and "sslmode" not in DATABASE_URL:
+Base = declarative_base()
+
+def build_engine(url: str):
+    if url.startswith("sqlite"):
+        return create_engine(url, connect_args={"check_same_thread": False})
+    
+    connect_args = {
+        "connect_timeout": 3
+    }
+    if "supabase" in url and "sslmode" not in url:
         connect_args["sslmode"] = "require"
 
-    engine = create_engine(
-        DATABASE_URL,
+    return create_engine(
+        url,
         pool_pre_ping=True,
         pool_recycle=300,
         connect_args=connect_args
     )
 
+try:
+    engine = build_engine(DATABASE_URL)
+    # Si es PostgreSQL, verificar conectividad rápida con timeout estricto para no colgar Vercel
+    if not DATABASE_URL.startswith("sqlite"):
+        from sqlalchemy import text
+        with engine.connect() as test_conn:
+            test_conn.execute(text("SELECT 1;"))
+except Exception as db_err:
+    print(f"AVISO RESILIENCIA: Base de datos remota inaccesible ({db_err}). Conmutando automáticamente a base local de respaldo.")
+    DATABASE_URL = default_db
+    engine = build_engine(DATABASE_URL)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
 
 def get_db():
     db = SessionLocal()
