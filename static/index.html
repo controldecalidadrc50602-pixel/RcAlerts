@@ -354,7 +354,40 @@
       body { background: #fff; }
       .card, .client-card { border: 1px solid #ccc; box-shadow: none; }
     }
+
+    /* Soporte Micro-Frontend para Ecosistemas (Firebase / Iframe) */
+    body.is-embedded header {
+      padding: 8px 16px;
+      background: var(--card-bg);
+    }
+    body.is-embedded .brand-box .brand-icon,
+    body.is-embedded .brand-box .brand-title,
+    body.is-embedded .brand-box .brand-sub {
+      display: none !important;
+    }
+    body.is-embedded main {
+      margin: 14px auto;
+      padding: 0 12px;
+    }
+    body.hide-header header {
+      display: none !important;
+    }
   </style>
+  <script>
+    (function() {
+      try {
+        const p = new URLSearchParams(window.location.search);
+        if (p.get('embedded') === 'true' || window.self !== window.top) {
+          document.documentElement.classList.add('is-embedded');
+          window.addEventListener('DOMContentLoaded', () => document.body.classList.add('is-embedded'));
+        }
+        if (p.get('hide_header') === 'true') {
+          document.documentElement.classList.add('hide-header');
+          window.addEventListener('DOMContentLoaded', () => document.body.classList.add('hide-header'));
+        }
+      } catch (e) { console.warn('Embedded detector:', e); }
+    })();
+  </script>
 </head>
 <body>
 

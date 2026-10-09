@@ -19,5 +19,16 @@
       "src": "/(.*)",
       "dest": "public/$1"
     }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self' https://*.web.app https://*.firebaseapp.com http://localhost:* http://127.0.0.1:*;"
+        }
+      ]
+    }
   ]
 }
